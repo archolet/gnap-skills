@@ -179,31 +179,23 @@ git commit -m "Initial project setup with specs and task plan"
 
 ---
 
-## FAZ C: Otonom Geliştirme
+## Next Step: /architect-loop
 
-### Adım 9: Architect Loop Başlat
+Phase A and B are complete. All documents, hooks, and state files are ready.
 
-Kullanıcıya son onay sor: "Otonom geliştirmeyi başlatayım mı?"
+Tell the user:
 
-Onay alındığında `/architect-loop` skill'ini tetikle. Bu, Opus 1M'in kendisinin
-orkestratör olarak çalışmasını sağlar:
-- SEN (Opus 1M) her görevi dış modellere gönderirsin
-- Sonuçları KENDİN kontrol edersin (1M context ile)
-- Build + test + Chrome kontrolü KENDİN yaparsın
-- Hata varsa KENDİN düzeltirsin
+> **Setup complete!** SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md, CLAUDE.md, and
+> enforcement hooks are all in place.
+>
+> To start autonomous development, run: **`/architect-loop`**
+>
+> This activates ARCHITECT MODE where Opus 1M dispatches tasks to worker models
+> (Sonnet, Codex, Gemini) and reviews their code. Source code writing is blocked
+> for the architect — all coding is done by worker models.
 
-Bu, `gnap daemon`'dan çok daha güçlüdür çünkü gerçek mimar (1M context) her kodu görür.
-- Her faz sonrası phase gate review (Opus)
-- Hata durumunda escalation (Codex GPT-5.4 risk analizi)
-- Tüm görevler bitince durur
-
-### İzleme
-
-```bash
-gnap status          # Görev durumu
-tail -f logs/*.log   # Canlı loglar
-touch .kill_switch   # Acil durdurma
-```
+**DO NOT start building code yourself. DO NOT trigger /architect-loop automatically.**
+The user must explicitly invoke it.
 
 ---
 
