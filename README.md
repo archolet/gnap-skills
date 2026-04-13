@@ -22,7 +22,7 @@ Opus 1M reads the task list, dispatches to appropriate worker model, waits for c
 
 **Features:**
 - Hardened worker dispatch (--max-turns, --permission-mode dontAsk, granular --allowedTools)
-- Build/test gate enforcement (TaskCompleted hook — exit 2 blocks completion)
+- Build/test gate enforcement (architect Step 6c — must pass before commit)
 - Destructive command blocking (PreToolUse hook)
 - Auto-lint after edits (PostToolUse hook)
 - Stop prevention while tasks pending (Stop hook)
@@ -207,7 +207,7 @@ gnap-skills/
 │   ├── hooks/                         # Enforcement hook scripts
 │   │   ├── pre-bash-guard.sh          # Block destructive commands
 │   │   ├── post-edit-lint.sh          # Auto-lint after edits
-│   │   ├── task-quality-gate.sh       # Build+test gate
+│   │   ├── architect-no-direct-write.sh # Block direct source code writing
 │   │   ├── stop-guard.sh             # Prevent premature stop
 │   │   └── notify-telegram.sh        # Telegram notifications
 │   ├── templates/                     # Project bootstrap templates

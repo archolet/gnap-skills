@@ -10,7 +10,7 @@ Do NOT call the system "fully autonomous" until ALL tests below pass in 3 consec
 
 ## Test 2: Build Gate Enforcement
 - [ ] Worker writes code that breaks the build (intentional syntax error)
-- [ ] `task-quality-gate.sh` blocks completion (exit 2)
+- [ ] Architect runs build+test in Step 6c, refuses to commit on failure
 - [ ] Architect detects build failure, fixes the code
 - [ ] Re-runs build — passes
 - [ ] Commits only after build passes

@@ -231,7 +231,7 @@ Return to Step 1. Repeat until all tasks are done.
 
 1. **Review EVERY code change** — Never auto-approve. Read every diff.
 2. **Build MUST pass** — Never commit without successful build.
-3. **Fix small issues YOURSELF** — Don't re-dispatch for trivial fixes.
+3. **Delegate everything** — You CANNOT write source code. Always dispatch to a worker.
 4. **Keep session alive** — Heartbeat must always run during dispatch.
 5. **Checkpoint every 5 tasks** — Launch app and test.
 6. **If context fills** — Compact, but NEVER forget the task list.

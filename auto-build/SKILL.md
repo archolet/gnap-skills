@@ -3,7 +3,7 @@ name: auto-build
 description: >
   End-to-end project planning and autonomous multi-agent development. Three phases:
   (A) Interactive discovery → SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md,
-  (B) GNAP orchestrator setup,
+  (B) Runtime setup (hooks, state, task queue),
   (C) Autonomous build with 5 AI agents.
   Triggers: "plan project", "auto build", "build this project", "start from scratch",
   "plan and build", "create new project"
@@ -22,11 +22,11 @@ Sıfırdan tam otonom proje geliştirme sistemi. Üç faz:
   │   → Proje tanımı, tech stack, mimari kararlar
   │   → SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md üretilir
   │
-  ├── FAZ B: GNAP Kurulum (otomatik)
-  │   → TASKS.md → .gnap/tasks.json dönüştürülür
+  ├── Phase B: Runtime Setup (automatic)
+  │   → TASKS.md → .autonomy/tasks.json parsed
   │   → CLAUDE.md proje kurallarıyla yazılır
   │
-  └── FAZ C: Otonom Build (daemon, insan gereksiz)
+  └── Phase C: Run /architect-loop (user triggers)
       → 5 ajan: Claude Code (builder) + Sonnet/Opus/Codex/Gemini (reviewers)
       → Her görev: build → test → review → commit
       → Her faz: phase gate review
@@ -87,7 +87,7 @@ IMPLEMENTATION.md'yi görevlere böl. Her görev:
 - Acceptance criteria machine-testable
 - Dosya listesi explicit
 
-**Görev formatı (GNAP uyumlu):**
+**Task format (architect-loop compatible):**
 ```markdown
 ### Task N: Görev Başlığı
 
@@ -163,7 +163,7 @@ mkdir -p .claude/hooks
 Copy these 5 hook scripts to `.claude/hooks/`:
 - `pre-bash-guard.sh` — Block destructive commands (rm -rf, sudo, git reset --hard)
 - `post-edit-lint.sh` — Auto-lint after file edits (Python/TS/C#/Go)
-- `task-quality-gate.sh` — Build + test must pass before task closes
+- `architect-no-direct-write.sh` — Block architect from writing source code directly
 - `stop-guard.sh` — Prevent stop while pending tasks exist
 - `notify-telegram.sh` — Send Telegram alerts (if configured)
 
@@ -183,7 +183,7 @@ echo '{"tasks":[],"current_task_index":0,"stats":{}}' > .autonomy/state.json
 **Verification:**
 ```bash
 ls .claude/hooks/    # Should show 5 .sh files
-cat .claude/settings.json | jq '.hooks | keys'  # Should show PreToolUse, PostToolUse, TaskCompleted, Stop, Notification
+cat .claude/settings.json | jq '.hooks | keys'  # Should show PreToolUse, PostToolUse, Stop, Notification
 ```
 
 ### Adım 8: Git Setup
@@ -223,7 +223,7 @@ The user must explicitly invoke it.
 3. **AskUserQuestion kullan.** Tech stack, veritabanı, auth gibi kararlar için seçenek sun.
 4. **Ölçeğe uyarla.** Hafta sonu projesi = 15-20 görev. Kurumsal = 100+ görev.
 5. **Dokümanlar `./docs/` dizinine.** SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md
-6. **GNAP uyumlu görev formatı.** Task N: başlık, description, files, criteria, deps, phase
+6. **Architect-loop compatible task format.** Task N: başlık, description, files, criteria, deps, phase
 7. **Her satır bu projeye özel.** Generic boilerplate yasak.
 
 ## Plugin Entegrasyonu
