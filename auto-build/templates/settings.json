@@ -34,17 +34,6 @@
         ]
       }
     ],
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .claude/hooks/task-quality-gate.sh",
-            "timeout": 120
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
@@ -73,23 +62,36 @@
       "Read",
       "Glob",
       "Grep",
-      "Bash(git diff *)",
-      "Bash(git status *)",
-      "Bash(git log *)",
-      "Bash(git add *)",
+      "Bash(git *)",
+      "Bash(claude -p *)",
+      "Bash(codex *)",
+      "Bash(gemini *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pytest *)",
+      "Bash(dotnet *)",
+      "Bash(go *)",
+      "Bash(cargo *)",
+      "Bash(ruff *)",
+      "Bash(mypy *)",
+      "Bash(curl *)",
       "Bash(cat *)",
       "Bash(ls *)",
       "Bash(mkdir *)",
-      "Bash(ruff *)",
-      "Bash(pytest *)",
-      "Bash(npm test *)",
-      "Bash(npm run build *)",
-      "Bash(dotnet build *)",
-      "Bash(dotnet test *)",
-      "Bash(go build *)",
-      "Bash(go test *)",
-      "Bash(cargo build *)",
-      "Bash(cargo test *)"
+      "Bash(touch *)",
+      "Bash(rm .task_done)",
+      "Bash(sleep *)",
+      "Bash(kill *)",
+      "Bash(echo *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(chmod *)",
+      "Bash(jq *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
@@ -97,7 +99,10 @@
       "Bash(chmod 777 *)",
       "Bash(git reset --hard *)",
       "Bash(git push --force *)",
-      "Bash(git clean -f *)"
+      "Bash(git push * --force *)",
+      "Bash(git clean -f *)",
+      "Bash(git branch -D main)",
+      "Bash(git branch -D master)"
     ]
   }
 }

@@ -115,24 +115,41 @@ Proje kök dizinine `CLAUDE.md` yaz. İçerik:
 
 ---
 
-## FAZ B: GNAP Kurulum
+## Phase B: Project Runtime Setup
 
-Kullanıcı onayı aldıktan sonra otomatik çalışır.
+Runs automatically after user approves all documents.
 
-### Adım 6: GNAP Ortamını Hazırla
+### Step 6: Parse TASKS.md into Task Queue
 
-```bash
-# TASKS.md'den GNAP görevleri yükle
-gnap load-tasks --tasks-file docs/TASKS.md
+Read `docs/TASKS.md` and convert each `### Task N: Title` block into a JSON object.
+Write the result to `.autonomy/tasks.json`:
 
-# Durumu kontrol et
-gnap status
+```json
+{
+  "project": "project-name",
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Task title",
+      "status": "pending",
+      "phase": 1,
+      "dependencies": [],
+      "description": "...",
+      "files_to_create": [],
+      "acceptance_criteria": []
+    }
+  ],
+  "current_task_index": 0,
+  "stats": {"total": 14, "done": 0}
+}
 ```
 
-Eğer `gnap` komutu bulunamazsa:
+Also create `.autonomy/` directory:
 ```bash
-pip3 install gnap-orchestrator  # or clone from github.com/archolet/AI_Automation
+mkdir -p .autonomy
 ```
+
+No external dependencies needed — YOU parse the markdown directly.
 
 ### Adım 7: Install Enforcement Hooks
 

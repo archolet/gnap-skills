@@ -10,68 +10,72 @@ user-invocable: true
 disable-model-invocation: true
 ---
 
-# Architect Review — Opus 1M Tam Codebase İncelemesi
+# Architect Review — Opus 1M Full Codebase Audit
 
-Sen (Opus 4.6 1M) yazılım mimarısın. Daemon (GNAP Orchestrator) farklı modellerle
-(Sonnet, Codex GPT-5.4, Gemini 3.1, Opus 200K) kod yazdı. Şimdi TÜM kodu inceleyip
-standardize edeceksin.
+You (Opus 4.6 1M) review the ENTIRE codebase after autonomous development.
+Multiple models may have written code — standardize and verify everything.
 
-## Neden Bu Gerekli?
+## When to Use
 
-- Sonnet hızlı ama bazen shallow kod yazar
-- Codex GPT-5.4 farklı naming convention kullanabilir
-- Gemini farklı error handling paterni tercih edebilir
-- Opus 200K context sınırlı, büyük resmi göremeyebilir
-- SEN 1M context ile tüm codebase'i tek seferde görebilirsin
+- After `/architect-loop` completes all tasks
+- After any significant autonomous development session
+- Before a release or deployment
 
-## İnceleme Akışı
+## Review Flow
 
-### Adım 1: Değişiklik Haritası
+### Step 1: Map All Changes
 
 ```bash
-# Daemon'un yaptığı tüm değişiklikleri listele
+# See all commits from autonomous development
 git log --oneline --since="24 hours ago"
-git diff --stat HEAD~N  # N = commit sayısı
+git diff --stat HEAD~N  # N = number of commits to review
 ```
 
-Tüm değişen dosyaları listele. Her dosyayı Read ile oku.
+Read every changed file with the Read tool. You have 1M context — use it.
 
-### Adım 2: Reviewer Raporlarını Oku
+Also check `.autonomy/state.json` for task results and any failures.
 
-`.gnap/reviews/` dizinindeki tüm dosyaları oku. Reviewerların bulduğu sorunları topla.
-Bu sorunlar düzeltilmiş mi kontrol et.
+### Step 2: Read Review History (if available)
 
-### Adım 3: Specialist Analiz
+Check if any review files exist:
+```bash
+ls .autonomy/reviews/ 2>/dev/null || echo "No review history"
+ls .gnap/reviews/ 2>/dev/null || echo "No GNAP reviews"
+```
 
-Her dosya için şu kontrolleri yap:
+Read any available review reports from previous sessions.
 
-**3a. Güvenlik Kontrolü:**
-- Hardcoded secret/password var mı?
-- SQL injection riski var mı?
-- Input validation yapılıyor mu?
-- Güvensiz dosya işlemleri var mı?
+### Step 3: Specialist Analysis
 
-**3b. Kod Standardı Kontrolü:**
-- Naming convention tutarlı mı? (snake_case for Python, camelCase for JS/TS)
-- Import sıralaması doğru mu? (stdlib → third-party → local)
-- Docstring'ler tutarlı mı? (Google style)
-- Error handling paterni aynı mı? (her modül aynı yaklaşımı kullanmalı)
-- Magic number/string var mı? (constant'a çevrilmeli)
+For EVERY changed file, check:
 
-**3c. Mimari Kontrolü:**
-- Modül sınırları ihlal ediliyor mu? (katman atlama)
-- Circular dependency var mı?
-- IMPLEMENTATION.md'deki mimari ile uyumlu mu?
-- CLAUDE.md kurallarına uyuluyor mu?
-- DRY ihlali var mı? (duplicate kod)
+**3a. Security:**
+- Hardcoded secrets/passwords?
+- SQL injection risks?
+- Input validation present?
+- Unsafe file operations?
 
-**3d. Performans Kontrolü:**
-- Gereksiz döngü/tekrar var mı?
-- Büyük dosyaları belleğe tamamen yükleme var mı?
-- N+1 query problemi var mı?
-- Gereksiz IO işlemi var mı?
+**3b. Code Standards:**
+- Naming conventions consistent across ALL files?
+- Import ordering correct? (stdlib → third-party → local)
+- Docstrings consistent? (same style everywhere)
+- Error handling pattern uniform? (every module same approach)
+- Magic numbers/strings? (should be constants)
 
-### Adım 4: Otomatik Düzeltme
+**3c. Architecture:**
+- Module boundaries respected? (no layer skipping)
+- Circular dependencies?
+- Matches IMPLEMENTATION.md design?
+- Follows CLAUDE.md rules?
+- DRY violations? (duplicate code across files)
+
+**3d. Performance:**
+- Unnecessary loops?
+- Loading entire files into memory?
+- N+1 query problems?
+- Unnecessary I/O?
+
+### Step 4: Auto-Fix (Stack-Aware)
 
 ```bash
 # Detect stack and run appropriate tools:
@@ -79,7 +83,6 @@ Her dosya için şu kontrolleri yap:
 # Python:
 #   ruff check --fix src/ tests/ && ruff format src/ tests/
 #   mypy src/ --ignore-missing-imports
-#   python3 -m pytest tests/ -v --tb=short
 
 # .NET:
 #   dotnet build && dotnet test
@@ -94,47 +97,47 @@ Her dosya için şu kontrolleri yap:
 #   go test ./...
 ```
 
-Sorunları bul ve düzelt:
-- Naming tutarsızlıklarını düzelt
-- Eksik docstring'leri ekle
-- Duplicate kodu refactor et
-- Import sıralamasını düzelt
-- Error handling'i standardize et
+Fix issues you find:
+- Naming inconsistencies → standardize
+- Missing docstrings → add
+- Duplicate code → refactor
+- Import ordering → fix
+- Error handling → standardize
 
-### Adım 5: Rapor ve Commit
+### Step 5: Report and Commit
 
-Bulguları şu formatta raporla:
+Present findings in this format:
 
 ```
-## Architect Review Raporu
+## Architect Review Report
 
-### Kritik Sorunlar (düzeltildi)
-- [ dosya:satır ] Sorun açıklaması → düzeltme
+### Critical Issues (fixed)
+- [file:line] Issue description → fix applied
 
-### Uyarılar (kullanıcıya sun)
-- [ dosya:satır ] Uyarı açıklaması
+### Warnings (presented to user)
+- [file:line] Warning description
 
-### İyileştirme Önerileri
-- Öneri açıklaması
+### Improvement Suggestions
+- Suggestion description
 
-### İstatistikler
-- Toplam incelenen dosya: N
-- Değiştirilen dosya: N
-- Düzeltilen sorun: N
-- Test durumu: PASSED/FAILED
-- Lint durumu: CLEAN/N error
+### Statistics
+- Total files reviewed: N
+- Files modified: N
+- Issues fixed: N
+- Test status: PASSED/FAILED
+- Lint status: CLEAN/N errors
 ```
 
-Düzeltmeler yapıldıysa:
+If fixes were applied:
 ```bash
 git add -A
 git commit -m "architect review: standardization + quality fixes"
 ```
 
-## Kurallar
+## Rules
 
-1. **Mantık değiştirme** — Sadece standardizasyon ve kalite düzeltmeleri. İş mantığına dokunma.
-2. **Test kırma** — Mevcut testler geçmeye devam etmeli. Test kıran değişiklik yapma.
-3. **Her düzeltmeyi açıkla** — Neden değiştirdiğini commit mesajında belirt.
-4. **Büyük refactoring'den kaçın** — Bu review, refactoring değil. Küçük düzeltmeler yap.
-5. **IMPLEMENTATION.md'yi referans al** — Mimari kararlar orada belgelenmiş.
+1. **Don't change logic** — Only standardization and quality fixes. Don't touch business logic.
+2. **Don't break tests** — All existing tests must keep passing. Never commit test-breaking changes.
+3. **Explain every fix** — State why in the commit message.
+4. **No big refactors** — This is review, not refactoring. Small targeted fixes only.
+5. **Reference IMPLEMENTATION.md** — Architectural decisions are documented there.

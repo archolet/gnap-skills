@@ -93,6 +93,7 @@ claude --remote-control
 - Skills work with Claude models only (Sonnet + Opus 200K as workers)
 - Codex and Gemini add multi-vendor perspective but are NOT required
 - No external pip packages required — all orchestration is via Claude Code + hooks
+- No GNAP dependency — task queue parsed directly from TASKS.md
 - Windows: Use WSL2 for tmux/caffeinate; hooks use bash
 
 ## Enforcement Hooks
@@ -101,11 +102,14 @@ Unlike prompt-based instructions, hooks are **deterministic** — they ENFORCE r
 
 | Hook | Script | Action | Exit Code |
 |------|--------|--------|-----------|
+| PreToolUse | `architect-no-direct-write.sh` | Block architect from writing source code | 2 = BLOCK |
 | PreToolUse | `pre-bash-guard.sh` | Block `rm -rf`, `sudo`, `git reset --hard` | 2 = BLOCK |
 | PostToolUse | `post-edit-lint.sh` | Auto-lint Python/TS/C#/Go files | 0 (observe only) |
-| TaskCompleted | `task-quality-gate.sh` | Build + test must pass | 2 = BLOCK completion |
 | Stop | `stop-guard.sh` | Don't stop while tasks pending | 2 = CONTINUE |
 | Notification | `notify-telegram.sh` | Send Telegram alerts | 0 |
+
+**Note**: Build/test gate is enforced in architect-loop Step 6c, not via TaskCompleted hook.
+The architect explicitly runs build+test and refuses to commit if they fail.
 
 ### How hooks are installed
 `/auto-build` Phase B copies hook scripts to your project's `.claude/hooks/` and generates `.claude/settings.json` with hook configuration. Hooks are project-specific and version-controlled.

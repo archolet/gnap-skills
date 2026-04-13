@@ -65,8 +65,8 @@ Before starting the loop:
    If found, ask: "Previous session found: N/M tasks done. Resume?"
    If user confirms, continue from `current_task_index`.
 
-2. **Check hooks are installed**: Verify `.claude/settings.json` has hooks configured.
-   If not, copy hooks from skill templates (auto-build/hooks/ and auto-build/templates/).
+2. **Check hooks are installed**: Verify `.claude/settings.json` exists and `.claude/hooks/` directory has scripts.
+   If not, tell the user: "Hooks not installed. Run /auto-build first or manually copy hooks from the gnap-skills repo."
 
 3. **Check task source**: Read `.autonomy/tasks.json` or `docs/TASKS.md`.
    If neither exists, ask user to run `/auto-build` first.
@@ -146,24 +146,32 @@ Read every changed file with the Read tool.
 - Unnecessary code?
 - Security issues?
 
-**6c. Build gate (stack-aware):**
+**6c. BUILD GATE — MANDATORY (do NOT skip):**
+
+You MUST run the build and tests. If they fail, DO NOT commit. Re-dispatch to fix.
+
 ```bash
-# Detect and build:
-# Node:    npm run build && npm test
-# .NET:    dotnet build && dotnet test
-# Python:  python -m pytest tests/ -v && ruff check src/
-# Go:      go build ./... && go test ./...
-# Rust:    cargo build && cargo test
+# Run appropriate build+test for the project stack:
+# Node:    npm run build 2>&1 && npm test 2>&1
+# .NET:    dotnet build 2>&1 && dotnet test 2>&1
+# Python:  python -m pytest tests/ -v 2>&1 && ruff check src/ 2>&1
+# Go:      go build ./... 2>&1 && go test ./... 2>&1
+# Rust:    cargo build 2>&1 && cargo test 2>&1
 ```
 
-**6d. Decision:**
-- ✅ **APPROVE**: Build passes + code is quality → commit
+If build/test FAILS:
+1. Read the error output
+2. Re-dispatch to the same or different worker with the error as context
+3. DO NOT commit broken code
+4. DO NOT move to the next task until this one builds
+
+**6d. Decision (only after build passes):**
+- ✅ **APPROVE**: Build passes + code quality OK → commit
   ```bash
   git add -A
   git commit -m "T001: Task title"
   ```
-- ❌ **REJECT + FIX YOURSELF**: Small issue → Edit it yourself, then commit
-- 🔄 **SEND BACK**: Big issue → re-dispatch to same or different model with retry context
+- 🔄 **SEND BACK**: Code quality issue or architectural concern → re-dispatch with feedback
 
 **6e. Update state:**
 Write to `.autonomy/state.json`:
