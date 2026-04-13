@@ -221,6 +221,12 @@ gnap-skills/
     └── install.sh                     # One-command installation
 ```
 
+## Documentation
+
+- **[VISION.md](VISION.md)** — Full architecture, design decisions, limitations, and what this is NOT
+- **[TESTING.md](TESTING.md)** — 10 acceptance tests, autonomy levels, stack coverage requirements
+- **[REVIEW_PROMPT.md](REVIEW_PROMPT.md)** — Deep analysis request for cross-model review
+
 ## License
 
 MIT
