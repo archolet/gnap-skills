@@ -1,11 +1,13 @@
 ---
 name: review-build
 description: >
-  Opus 1M yazılım mimarı review. Daemon (gnap) tamamlandıktan sonra tüm kodu inceler,
-  farklı modellerin çıktılarını standardize eder, güvenlik/performans/mimari kontrolü yapar.
-  Tetikleyiciler: "review yap", "kodu incele", "review-build", "mimar kontrolü",
-  "standardize et", "architect review", "kod kalitesi kontrol"
+  Opus 1M full codebase audit. Reviews all code after autonomous build, standardizes
+  multi-model output, checks security/performance/architecture. Language-agnostic analysis
+  with stack-specific tool integration.
+  Triggers: "review build", "code review", "architect review", "audit code",
+  "standardize", "quality check"
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # Architect Review — Opus 1M Tam Codebase İncelemesi
@@ -72,15 +74,24 @@ Her dosya için şu kontrolleri yap:
 ### Adım 4: Otomatik Düzeltme
 
 ```bash
-# Lint ve format düzeltmeleri
-ruff check --fix src/ tests/
-ruff format src/ tests/
+# Detect stack and run appropriate tools:
 
-# Tip kontrolü
-mypy src/ --ignore-missing-imports 2>&1 | head -20
+# Python:
+#   ruff check --fix src/ tests/ && ruff format src/ tests/
+#   mypy src/ --ignore-missing-imports
+#   python3 -m pytest tests/ -v --tb=short
 
-# Test suite
-python3 -m pytest tests/ -v --tb=short
+# .NET:
+#   dotnet build && dotnet test
+#   dotnet format --verify-no-changes
+
+# Node/TypeScript:
+#   npm run lint -- --fix && npm run build
+#   npm test
+
+# Go:
+#   go vet ./... && golangci-lint run
+#   go test ./...
 ```
 
 Sorunları bul ve düzelt:

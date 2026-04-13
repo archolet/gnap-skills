@@ -53,7 +53,7 @@ Question: "Do you have a programming language preference?"
 Options: ["Yes, I know what I want", "Help me choose", "No preference"]
 ```
 
-If "Help me choose" → read `${CLAUDE_PLUGIN_ROOT}/references/tech-stacks.md` and run the stack advisor flow.
+If "Help me choose" → read `${CLAUDE_SKILL_DIR}/references/tech-stacks.md` and run the stack advisor flow.
 
 If "Yes, I know what I want" → ask freeform: "What language and framework?"
 

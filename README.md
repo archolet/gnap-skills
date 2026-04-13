@@ -56,10 +56,22 @@ claude
 
 ## Requirements
 
-- Claude Code with Opus 4.6 1M model
-- Codex CLI (`npm install -g @openai/codex`)
-- Gemini CLI (`npm install -g @google/gemini-cli`)
-- tmux + caffeinate (for long-running sessions)
+### Required
+- Claude Code v2.1+ with Opus 4.6 1M model (Max subscription)
+- tmux (for persistent sessions)
+- caffeinate (macOS, prevents sleep)
+
+### Optional (for multi-model orchestration)
+- Codex CLI (`npm install -g @openai/codex`) — OpenAI developer
+- Gemini CLI (`npm install -g @google/gemini-cli`) — Google developer
+- Chrome MCP extension — for browser-based testing at checkpoints
+- GNAP Orchestrator CLI — for daemon mode (`github.com/archolet/AI_Automation`)
+- Telegram Bot — for remote notifications (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` env vars)
+
+### Notes
+- Skills work without optional dependencies (architect-loop can use only Claude models)
+- Codex/Gemini add multi-vendor perspective but are not required
+- GNAP CLI is only needed for `/auto-build` Phase B (task loading); `/architect-loop` works without it
 
 ## How It Works
 

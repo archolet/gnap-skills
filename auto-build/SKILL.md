@@ -1,13 +1,14 @@
 ---
 name: auto-build
 description: >
-  Sıfırdan proje planlama ve otonom çoklu-ajan geliştirme. Üç fazda çalışır:
-  (A) İnteraktif keşif ile proje dökümanları oluşturur (SPECIFICATION, IMPLEMENTATION, TASKS),
-  (B) GNAP orkestratörünü yapılandırır,
-  (C) 5 ajan ile otonom olarak projeyi kodlar.
-  Tetikleyiciler: "projeyi planla", "sıfırdan başla", "otonom geliştir", "auto build",
-  "build this project", "bu projeyi otonom geliştir", "plan ve build"
+  End-to-end project planning and autonomous multi-agent development. Three phases:
+  (A) Interactive discovery → SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md,
+  (B) GNAP orchestrator setup,
+  (C) Autonomous build with 5 AI agents.
+  Triggers: "plan project", "auto build", "build this project", "start from scratch",
+  "plan and build", "create new project"
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # Auto-Build: Plan → Build → Deliver
@@ -51,7 +52,7 @@ Bu faz interaktiftir. Kullanıcıyla konuşarak projeyi anla.
 
 ### Adım 1: Proje Kimliği
 
-Read `${SKILL_DIR}/references/elicitation-guide.md` for the full question framework.
+Read `${CLAUDE_SKILL_DIR}/references/elicitation-guide.md` for the full question framework.
 
 Kullanıcıya sor (AskUserQuestion kullan):
 1. "Bu proje ne yapıyor?" (elevator pitch)
@@ -60,25 +61,25 @@ Kullanıcıya sor (AskUserQuestion kullan):
 4. Kapsam: MVP / Full Product / Enterprise
 5. Tech stack tercihi: "Biliyorum" / "Yardım et" / "Sen seç"
 
-**Tech stack yardımı gerekiyorsa:** Read `${SKILL_DIR}/references/tech-stacks.md`
+**Tech stack yardımı gerekiyorsa:** Read `${CLAUDE_SKILL_DIR}/references/tech-stacks.md`
 
 ### Adım 2: SPECIFICATION.md Üret
 
-Read `${SKILL_DIR}/references/specification-guide.md` before generating.
+Read `${CLAUDE_SKILL_DIR}/references/specification-guide.md` before generating.
 
 Projenin **ne** olduğunu tanımla. `./docs/SPECIFICATION.md` olarak kaydet.
 Kullanıcıya göster, onay al.
 
 ### Adım 3: IMPLEMENTATION.md Üret
 
-Read `${SKILL_DIR}/references/implementation-guide.md` AND `${SKILL_DIR}/references/design-patterns.md`
+Read `${CLAUDE_SKILL_DIR}/references/implementation-guide.md` AND `${CLAUDE_SKILL_DIR}/references/design-patterns.md`
 
 Projenin **nasıl** yapılacağını tanımla. Tech stack, dizin yapısı, modüller, API'ler.
 `./docs/IMPLEMENTATION.md` olarak kaydet. Kullanıcıya göster, onay al.
 
 ### Adım 4: TASKS.md Üret
 
-Read `${SKILL_DIR}/references/tasks-guide.md` before generating.
+Read `${CLAUDE_SKILL_DIR}/references/tasks-guide.md` before generating.
 
 IMPLEMENTATION.md'yi görevlere böl. Her görev:
 - Tek oturumda tamamlanabilir
@@ -130,7 +131,7 @@ gnap status
 
 Eğer `gnap` komutu bulunamazsa:
 ```bash
-pip3 install -e /Users/serkanozdogan/Desktop/AI_Automation
+pip3 install gnap-orchestrator  # or clone from github.com/archolet/AI_Automation
 ```
 
 ### Adım 7: Git Hazırlığı
