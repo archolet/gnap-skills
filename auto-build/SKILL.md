@@ -134,7 +134,42 @@ Eğer `gnap` komutu bulunamazsa:
 pip3 install gnap-orchestrator  # or clone from github.com/archolet/AI_Automation
 ```
 
-### Adım 7: Git Hazırlığı
+### Adım 7: Install Enforcement Hooks
+
+Create `.claude/hooks/` directory and copy hook scripts from skill templates.
+These hooks ENFORCE quality gates — they are not optional.
+
+```bash
+mkdir -p .claude/hooks
+```
+
+Copy these 5 hook scripts to `.claude/hooks/`:
+- `pre-bash-guard.sh` — Block destructive commands (rm -rf, sudo, git reset --hard)
+- `post-edit-lint.sh` — Auto-lint after file edits (Python/TS/C#/Go)
+- `task-quality-gate.sh` — Build + test must pass before task closes
+- `stop-guard.sh` — Prevent stop while pending tasks exist
+- `notify-telegram.sh` — Send Telegram alerts (if configured)
+
+The hook scripts are located at `${CLAUDE_SKILL_DIR}/hooks/`.
+Read each script from the skill directory and write it to `.claude/hooks/` in the project.
+Make all scripts executable: `chmod +x .claude/hooks/*.sh`
+
+Then create `.claude/settings.json` with hook configuration.
+Use the template from `${CLAUDE_SKILL_DIR}/templates/settings.json`.
+
+Also create `.autonomy/` directory for state management:
+```bash
+mkdir -p .autonomy
+echo '{"tasks":[],"current_task_index":0,"stats":{}}' > .autonomy/state.json
+```
+
+**Verification:**
+```bash
+ls .claude/hooks/    # Should show 5 .sh files
+cat .claude/settings.json | jq '.hooks | keys'  # Should show PreToolUse, PostToolUse, TaskCompleted, Stop, Notification
+```
+
+### Adım 8: Git Setup
 
 ```bash
 git init  # Eğer repo değilse
@@ -146,7 +181,7 @@ git commit -m "Initial project setup with specs and task plan"
 
 ## FAZ C: Otonom Geliştirme
 
-### Adım 8: Architect Loop Başlat
+### Adım 9: Architect Loop Başlat
 
 Kullanıcıya son onay sor: "Otonom geliştirmeyi başlatayım mı?"
 
