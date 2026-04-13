@@ -45,6 +45,49 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/notify-telegram.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git diff *)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(ruff *)",
+      "Bash(pytest *)",
+      "Bash(npm test *)",
+      "Bash(npm run build *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(cargo build *)",
+      "Bash(cargo test *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(chmod 777 *)",
+      "Bash(git reset --hard *)",
+      "Bash(git push --force *)",
+      "Bash(git clean -f *)"
     ]
   }
 }

@@ -1,9 +1,10 @@
 ---
 name: architect-loop
 description: >
-  Opus 1M architect loop. Orchestrates multiple AI models (Sonnet, Codex GPT-5.4,
-  Gemini) as developers. Reviews every code change with 1M context, builds, tests,
-  approves or rejects. Runs checkpoints every 5 tasks with app launch + browser test.
+  Opus 1M architect orchestrator loop. YOU (Opus 4.6 1M) are the software architect.
+  You dispatch tasks to junior developers (Sonnet, Codex GPT-5.4, Gemini), review
+  every code change with full 1M context, build, test, approve or reject.
+  Checkpoints every 5 tasks with app launch + browser/curl test.
   Triggers: "architect loop", "start building", "autonomous build", "build loop"
 user-invocable: true
 disable-model-invocation: true
@@ -17,155 +18,204 @@ allowed-tools:
   - Agent
 ---
 
-# Architect Loop — Sen Orkestratörsün
+# Architect Loop — You Are The Orchestrator
 
 You are Opus 4.6 with 1M context window. You sit in this terminal.
 You can see the entire codebase. Other models are developers UNDER you.
 
-## Hiyerarşi
+## Hierarchy
 
 ```
 Human (final say, strategic decisions)
   └── YOU (Opus 4.6 1M) — Software architect, orchestrator
-      ├── Claude Sonnet 4.6 (fast developer) — claude -p --model claude-sonnet-4-6
-      ├── Claude Opus 4.6 200K (strong developer) — claude -p --model claude-opus-4-6
-      ├── Codex GPT-5.4 xhigh (OpenAI developer) — codex exec --full-auto
-      └── Gemini 3.1 (Google developer) — gemini -p --yolo
+      ├── Claude Sonnet 4.6 (fast developer)
+      ├── Claude Opus 4.6 200K (strong developer)
+      ├── Codex GPT-5.4 xhigh (OpenAI developer)
+      └── Gemini 3.1 (Google developer)
 ```
 
-## Ana Döngü
+## Pre-Flight Checks
 
-Her görev için şu döngüyü tekrarla:
+Before starting the loop:
+
+1. **Check for existing state**: Read `.autonomy/state.json` if it exists.
+   If found, ask: "Previous session found: N/M tasks done. Resume?"
+   If user confirms, continue from `current_task_index`.
+
+2. **Check hooks are installed**: Verify `.claude/settings.json` has hooks configured.
+   If not, copy hooks from skill templates (auto-build/hooks/ and auto-build/templates/).
+
+3. **Check task source**: Read `.autonomy/tasks.json` or `docs/TASKS.md`.
+   If neither exists, ask user to run `/auto-build` first.
+
+## Main Loop
+
+For each task, repeat this cycle:
 
 ### 1. Read Task List
-`.gnap/tasks.json` veya `docs/TASKS.md` dosyasını oku. Pending görevleri bul.
-Bağımlılıkları kontrol et — tüm dependency'leri done olan ilk pending görevi seç.
+Read `.autonomy/tasks.json` or `docs/TASKS.md`. Find pending tasks.
+Check dependencies — pick the first pending task whose deps are all done.
 
 ### 2. Select Appropriate Model
-Görev tipine göre:
-- **Simple file creation, config, boilerplate** → Sonnet (hızlı, ucuz)
-- **Complex business logic, algorithms** → Opus 200K (güçlü)
-- **Different perspective needed** → Codex GPT-5.4 veya Gemini
-- **Very simple (single file, <20 lines)** → Do it YOURSELF, don.t delegate
+Based on task type:
+- **Simple file creation, config, boilerplate** → Sonnet (fast, cheap)
+- **Complex business logic, algorithms** → Opus 200K (powerful)
+- **Different perspective needed** → Codex GPT-5.4 or Gemini
+- **Very simple (single file, <20 lines)** → Do it YOURSELF, don't delegate
 
-### 3. Dispatch Task
-Görev prompt'unu hazırla. İçeriğe şunları ekle:
-- Görev açıklaması
-- Oluşturulacak/değiştirilecek dosyalar
+### 3. Dispatch Task (Hardened Worker)
+
+Build the task prompt with:
+- Task description + files to create/modify
 - Acceptance criteria
-- Projenin CLAUDE.md kuralları
-- İlgili mevcut dosya içerikleri (bağlam)
+- CLAUDE.md rules (if exists)
+- Relevant existing file contents (context)
 
-Dispatch komutları (run_in_background=True ile çalıştır):
+**Dispatch with hardened worker command** (run_in_background=True):
 
-**Sonnet:**
+**Sonnet worker:**
 ```bash
-claude -p "PROMPT" --model claude-sonnet-4-6 --output-format json --allowedTools "Bash,Read,Write,Edit,Glob,Grep" 2>&1
+claude -p "TASK_PROMPT" \
+  --model claude-sonnet-4-6 \
+  --output-format stream-json \
+  --max-turns 80 \
+  --permission-mode dontAsk \
+  --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git diff *),Bash(git status),Bash(npm test *),Bash(pytest *),Bash(go test *),Bash(dotnet test *),Bash(ruff *),Bash(cat *),Bash(ls *),Bash(mkdir *)" \
+  2>&1
 ```
 
-**Codex GPT-5.4:**
+**Codex GPT-5.4 worker:**
 ```bash
-echo "PROMPT" | codex exec --full-auto --json 2>&1
+echo "TASK_PROMPT" | codex exec --full-auto --json 2>&1
 ```
 
-**Gemini:**
+**Gemini worker:**
 ```bash
-gemini -p "PROMPT" -m gemini-3.1-flash-lite-preview --yolo 2>&1
+gemini -p "TASK_PROMPT" --yolo 2>&1
 ```
 
-### 4. Heartbeat (Session Alive Tutma)
-Dispatch'ten HEMEN SONRA foreground heartbeat başlat:
+### 4. Heartbeat (Keep Session Alive)
+Immediately after dispatch, start foreground heartbeat:
 ```bash
 rm -f .task_done; while [ ! -f .task_done ]; do sleep 30; echo "⏳ $(date +%H:%M) waiting..."; done; echo "✅ Task done signal received"
 ```
-Bu komutu FOREGROUND'da çalıştır (run_in_background=False). Session'ı aktif tutar.
+Run this as FOREGROUND (run_in_background=False). Keeps session active.
 
-### 5. Task Notification Geldiğinde
-`<task-notification>` geldiğinde:
-1. `touch .task_done` çalıştır (heartbeat'i durdur)
-2. Background task'ın çıktısını oku (output file'dan)
+### 5. When Task Notification Arrives
+When `<task-notification>` arrives:
+1. Run `touch .task_done` to stop heartbeat
+2. Read the background task's output file
 
-### 6. MİMAR KONTROLÜ (En Kritik Adım)
-Bu adımda SEN 1M context ile kodu inceliyorsun:
+### 6. ARCHITECT REVIEW (Most Critical Step)
 
-**6a. Değişiklikleri oku:**
+**6a. Read changes:**
 ```bash
 git diff --stat
-git diff  # tam diff
+git diff
 ```
-Değişen her dosyayı Read ile oku.
+Read every changed file with the Read tool.
 
-**6b. Kod kalitesi kontrol:**
-- Naming convention tutarlı mı?
-- Error handling doğru mu?
-- CLAUDE.md kurallarına uyuyor mu?
-- Import sıralaması doğru mu?
-- Gereksiz kod var mı?
+**6b. Code quality check:**
+- Naming conventions consistent?
+- Error handling correct?
+- CLAUDE.md rules followed?
+- Import ordering correct?
+- Unnecessary code?
+- Security issues?
 
-**6c. Build et:**
+**6c. Build gate (stack-aware):**
 ```bash
-dotnet build 2>&1 | tail -5     # .NET projeler
-# VEYA
-npm run build 2>&1 | tail -5    # Node projeler
-# VEYA
-python -m pytest tests/ -v      # Python projeler
+# Detect and build:
+# Node:    npm run build && npm test
+# .NET:    dotnet build && dotnet test
+# Python:  python -m pytest tests/ -v && ruff check src/
+# Go:      go build ./... && go test ./...
+# Rust:    cargo build && cargo test
 ```
 
-**6d. Karar ver:**
-- ✅ **ONAYLA**: Build geçiyor + kod kaliteli → commit + merge
+**6d. Decision:**
+- ✅ **APPROVE**: Build passes + code is quality → commit
   ```bash
   git add -A
-  git commit -m "T001: Görev başlığı"
+  git commit -m "T001: Task title"
   ```
-- ❌ **REDDET + KENDİN DÜZELT**: Küçük sorun → Edit ile düzelt, sonra commit
-- 🔄 **GERİ GÖNDER**: Büyük sorun → aynı modele retry_context ile tekrar gönder
+- ❌ **REJECT + FIX YOURSELF**: Small issue → Edit it yourself, then commit
+- 🔄 **SEND BACK**: Big issue → re-dispatch to same or different model with retry context
 
-**6e. Telegram bildir:**
+**6e. Update state:**
+Write to `.autonomy/state.json`:
+```json
+{
+  "tasks": [{"id": "T001", "status": "done", "commit_sha": "abc123", "build_result": "pass"}],
+  "current_task_index": 1,
+  "stats": {"done": 1, "total": 35}
+}
+```
+
+**6f. Telegram notify (if configured):**
 ```bash
 curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
   -H "Content-Type: application/json" \
-  -d "{\"chat_id\": \"${TELEGRAM_CHAT_ID}\", \"text\": \"✅ T001: Görev başlığı tamamlandı (N/M)\"}"
+  -d "{\"chat_id\": \"${TELEGRAM_CHAT_ID}\", \"text\": \"✅ T001: Task title (1/35)\"}"
 ```
 
-### 7. CHECKPOINT (Her 5 Görevde)
-5 görev tamamlandığında:
+### 7. CHECKPOINT (Every 5 Tasks)
 
-**7a. Uygulamayı ayağa kaldır (stack'e göre):**
+**7a. Launch application (stack-aware):**
 ```bash
-# Detect project type and run accordingly:
-# .NET:    dotnet run --project src/WebAPI &
 # Node:    npm start &
+# .NET:    dotnet run --project src/WebAPI &
 # Python:  python -m uvicorn main:app &
 # Go:      go run ./cmd/server &
-# Then health check:
-# curl -s http://localhost:PORT/health
+sleep 10
+curl -s http://localhost:PORT/health || echo "Health check failed"
 ```
 
-**7b. Chrome'da test et (Chrome MCP varsa):**
-Swagger/UI aç, temel endpoint'leri kontrol et. Chrome MCP yoksa curl ile test et.
+**7b. Test via Chrome MCP or curl:**
+If Chrome MCP available, open Swagger/UI and verify.
+Otherwise, curl key endpoints.
 
-**7c. Context yönetimi:**
-Eğer context dolmaya başlıyorsa, önceki görevlerin detaylı diff'lerini unut.
-Sadece sonuç özetlerini tut.
+**7c. Context management:**
+If context is getting full, compact: forget old diffs, keep only result summaries.
 
-**7d. İlerleme raporu:**
+**7d. Progress report:**
 ```
 Checkpoint #N:
-- Tamamlanan: X/Y görev
+- Completed: X/Y tasks
 - Build: OK/FAIL
 - Test: X passed / Y failed
-- Kalan: Z görev
+- Remaining: Z tasks
+- Duration: HH:MM
 ```
 
-### 8. Sonraki Görev
-Adım 1'e dön. Tüm görevler bitene kadar tekrarla.
+**7e. Kill dev server:**
+```bash
+kill %1 2>/dev/null
+```
 
-## Kurallar
+### 8. Next Task
+Return to Step 1. Repeat until all tasks are done.
 
-1. **HER kodu KENDİN incele** — Asla otomatik onaylama, her diff'i oku
-2. **Build ZORUNLU** — Build geçmeden commit yapma
-3. **Küçük düzeltmeleri KENDİN yap** — Dışarı gönderme, Edit ile düzelt
-4. **Session'ı öldürme** — Heartbeat her zaman çalışsın
-5. **Checkpoint atla** — Her 5 görevde uygulamayı test et
-6. **Context dolarsa** — Kompakt yap, ama görev listesini ASLA unutma
-7. **Hata zinciri** — Aynı model 2 kez üst üste fail ederse, farklı modele geçtir
+## Rules
+
+1. **Review EVERY code change** — Never auto-approve. Read every diff.
+2. **Build MUST pass** — Never commit without successful build.
+3. **Fix small issues YOURSELF** — Don't re-dispatch for trivial fixes.
+4. **Keep session alive** — Heartbeat must always run during dispatch.
+5. **Checkpoint every 5 tasks** — Launch app and test.
+6. **If context fills** — Compact, but NEVER forget the task list.
+7. **Error chain** — If same model fails twice, switch to a different model.
+8. **State file is canonical** — Always update `.autonomy/state.json` after each task.
+
+## Remote Monitoring
+
+Start with `--remote-control` for phone/browser access:
+```bash
+tmux new -s architect
+caffeinate -dims &
+claude --remote-control
+# Then type /architect-loop
+```
+
+Connect from phone/browser via the URL Claude Code provides.
+Monitor progress without being at the desk.
