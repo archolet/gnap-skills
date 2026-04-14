@@ -81,8 +81,6 @@
       "Bash(mkdir -p *)",
       "Bash(touch .autonomy/*)",
       "Bash(rm -f .autonomy/*)",
-      "Bash(python - *)",
-      "Bash(python3 - *)",
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git show *)",
@@ -128,7 +126,9 @@
       "Bash(git clean -f *)",
       "Bash(rm -rf *)",
       "Bash(sudo *)",
-      "Bash(chmod 777 *)"
+      "Bash(chmod 777 *)",
+      "Bash(python - *)",
+      "Bash(python3 - *)"
     ]
   },
   "sandbox": {

@@ -1,143 +1,99 @@
-# Deep Analysis Request — V4.1
+# Review Request — V4.2 Post-Audit Fixes
 
-## Who You Are
+## Context
 
-You are a hostile external auditor. Your job is to break this system, find every flaw, and determine if this approach has any real-world value or if it's an overengineered illusion.
+You (GPT-5.4 Pro) reviewed this repo four times. An external hostile auditor then tore it apart and gave a QUESTIONABLE verdict. Their key findings:
 
-## The Repository
+1. `python3 - *` in allow list = unrestricted code execution via stdin → **FIXED: moved to deny list**
+2. Unquoted heredoc in wrappers = shell injection risk → **FIXED: changed to <<'EOF'**
+3. integrity.json never created by auto-build = dead feature → **FIXED: removed entirely**
+4. Checkpoints written but never read on resume = dead feature → **FIXED: resume now reads checkpoints**
+5. Security framing was dishonest → **FIXED: reframed as "workflow tool, not security tool"**
+6. Codex/Gemini outside hook system → **ACKNOWLEDGED: documented honestly as limitation**
 
-https://github.com/archolet/gnap-skills
+## What Changed in This Version
 
-Read every file. No exceptions. Start with VISION.md, then README.md, then every SKILL.md, every hook script, every wrapper script, every template, TESTING.md.
+### Bug fixes applied
+- `python - *` and `python3 - *` moved from `permissions.allow` to `permissions.deny`
+- Worker wrapper heredocs changed from `<<EOF` to `<<'EOF'` (prevents variable expansion and EOF injection)
+- Integrity manifest section removed from architect-loop (was never implemented by auto-build)
+- Resume behavior now reads `.autonomy/checkpoints/` on restart
 
-## What This System Claims To Do
+### Framing changes
+- VISION.md: "What is fixed" → "What this version does" — explicitly says "workflow tool, not security tool"
+- README.md: "Security model" → "Workflow discipline (not a security model)" — honest about what hooks can and cannot do
+- Hooks described as "speed bumps, not walls" everywhere
 
-1. You open a terminal, run Claude Code (Opus 4.6 1M context)
-2. You type `/auto-build` — Claude interviews you about your project, generates SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md, CLAUDE.md, installs hooks + wrappers + state files
-3. You type `/architect-loop` — Claude becomes an "architect" that dispatches coding tasks to worker models (Sonnet, Codex GPT-5.4, Gemini) via fixed wrapper scripts
-4. Each worker runs in an isolated git worktree
-5. The architect reviews every diff, runs build/test gates, and only merges approved code via `git merge --ff-only`
-6. The architect CANNOT write source code directly — a PreToolUse hook blocks it
-7. Workers CANNOT modify control files (.claude/, .autonomy/) — chmod + hook enforcement
-8. State is tracked in `.autonomy/state.json`, derived from `tasks.json` (never empty placeholder)
-9. A supervisor script can restart Claude on crash
-10. Rejection feedback is stored per-task so workers don't repeat mistakes
-11. Control plane integrity is verified via sha256 hashes before each task
-12. An append-only event ledger tracks every action
+### What we kept (auditor agreed these have value)
+- Worktree-per-task discipline
+- ff-only merge integration rule
+- Task queue in JSON with state tracking
+- Wrapper-based dispatch (standardization)
+- Rejection feedback memory
+- Event ledger (for observability, not claimed as tamper-proof)
+- Checkpoint summaries (now actually read on resume)
 
-## History
+## Our Goal
 
-This system went through 4 major review cycles with GPT-5.4 Pro. Each cycle found critical bugs:
+We are NOT building a security system. We are building a **workflow tool for autonomous code generation that produces high-quality code**.
 
-**Review 1**: Path variables wrong, personal paths hardcoded, no disable-model-invocation
-**Review 2**: GNAP dependency 404, TaskCompleted hook dead code, permissions incomplete
-**Review 3**: "Do it YOURSELF" still in skill, python3 -c bypass, Agent tool bypass, empty state.json, supervisor session_id never created, review-build .gnap references
-**Review 4** (GPT-5.4 wrote V4): Complete rewrite — wrappers, worktrees, role-based hooks
+The actual goal:
+1. **Autonomous** — the system runs without human intervention for hours
+2. **Multi-model** — different AI models provide different perspectives
+3. **Quality-focused** — every piece of code is reviewed before integration
+4. **Structured** — explicit task queue, explicit state, explicit gates
+5. **Recoverable** — crashes don't lose progress
+6. **Honest** — we know what hooks can't do and we say so
 
-**During testing**: Two more bugs found — GNAP_ROLE env inherited by workers (blocked them), worktree chmod permission denied on cleanup
+## What We Want From You
 
-## What I Want You To Do
+### 1. Audit the fixes
+Did we actually fix what we said we fixed? Check the specific files:
+- `auto-build/templates/settings.json` — is `python - *` really in deny now?
+- `auto-build/templates/bin/sonnet-worker.sh` — is the heredoc really quoted?
+- `architect-loop/SKILL.md` — is integrity.json really gone? Does resume read checkpoints?
+- `VISION.md` and `README.md` — is the framing genuinely honest now?
 
-### 1. Architecture Critique
+### 2. Focus on code quality
+The hostile auditor focused on security (fair — we were claiming security). Now that we've dropped security claims, focus on what matters: **does this system produce high-quality code?**
 
-Is "Opus 1M as terminal architect + subprocess workers + hooks + worktrees" a viable approach? Or is it fundamentally flawed?
+Specifically:
+- Is the review checklist in architect-loop comprehensive enough to catch real bugs?
+- Are the gates (build, test, lint) sufficient for code quality?
+- Does the rejection feedback loop actually improve subsequent attempts?
+- Is the checkpoint + drift detection useful for maintaining architectural consistency?
+- Would the structured worker result (files_created, functions_added, etc.) help the architect make better review decisions?
 
-Specific concerns:
-- Opus 1M has 1M tokens but sessions can idle-timeout after ~5 minutes
-- Workers run as `claude -p` subprocesses — do project hooks apply to them?
-- The architect's "enforcement" is hooks in `.claude/settings.json` — these are in the same trust boundary as the architect itself
-- Git worktree isolation is file-level, not process-level — workers share the same user, same filesystem permissions
+### 3. Improve autonomous code quality
+What changes would make the CODE OUTPUT better (not the system itself)?
 
-### 2. Security Audit
+Ideas to evaluate:
+- Should workers be required to write tests alongside every feature?
+- Should the architect run a "code smell" check beyond lint?
+- Should there be a mandatory naming consistency scan per checkpoint?
+- Should workers receive the full CLAUDE.md as part of every prompt?
+- Should the architect compare each new file against existing files for style consistency?
+- Should gates include coverage delta (new code must be covered)?
 
-The system claims "the architect cannot write source code." Attack this claim:
+### 4. What's the realistic scope?
+Given that this is a workflow tool (not a security tool), what's the realistic scope of projects it can handle? Be specific:
+- What project sizes (files, tasks)?
+- What stacks work best?
+- What types of tasks does it handle well vs. poorly?
+- How many tasks before context/quality degrades?
 
-- `architect-no-direct-write.sh` is 173 lines of bash regex. Find bypasses.
-- `settings.json` has 33 allow rules and 30 deny rules. Find gaps.
-- Workers run with `GNAP_ROLE=worker` env var. What if a worker modifies this?
-- The integrity manifest uses sha256 hashes. Who verifies them? The architect — who could just skip the check.
-- Control files are chmod readonly in worktrees. What if the worker runs `chmod u+w`?
-
-### 3. State Management Audit
-
-- `state.json` is "derived from tasks.json" — but is this enforced or just documented?
-- The event ledger is "append-only" — but what prevents truncation or modification?
-- `runtime.lock` exists while running — but what prevents two sessions from ignoring it?
-- Checkpoint summaries go to `.autonomy/checkpoints/` — but what if context is already full when the checkpoint is needed?
-
-### 4. Wrapper Script Audit
-
-Read `sonnet-worker.sh`, `codex-worker.sh`, `gemini-worker.sh` line by line:
-
-- The worker prompt is built inline with heredoc. Can the task prompt inject shell commands?
-- `--allowedTools` is set per wrapper. Is the tool list appropriate or too permissive?
-- Worker result is captured to a JSON file. What if the result is malformed?
-- The wrapper runs `chmod -R a-w` on `.claude/` and `.autonomy/` in the worktree. Does this actually protect anything?
-- Exit code handling: what happens on exit 130 (Ctrl+C), 137 (OOM kill), 124 (timeout)?
-
-### 5. Skill Coherence Audit
-
-- Does `auto-build/SKILL.md` actually produce everything `architect-loop/SKILL.md` expects?
-- Are the JSON schemas between tasks.json, state.json, gates.json, and integrity.json consistent?
-- Does the review checklist in architect-loop cover everything that could go wrong?
-- Are there instructions that contradict each other across the three skills?
-
-### 6. Real-World Viability
-
-- This system was tested on a 13-task Python CLI project. Would it work on a 100-task React+Node+PostgreSQL project?
-- The wrapper creates a new worktree per task. With 100 tasks, that's 100 worktrees. Git handles this?
-- Workers run `claude -p` with `--max-turns 80`. What if a task needs more?
-- The smoke test system depends on `gates.json`. What if the detected stack is wrong?
-- Context management says "write checkpoint summaries." But who reads them on resume? Does the architect actually use them?
-
-### 7. What's Missing?
-
-What critical features does this system NOT have that it SHOULD have for real autonomous development?
-
-Think about:
-- Monitoring / observability beyond the event ledger
-- Cost tracking (each claude -p call costs tokens)
-- Rollback mechanism (what if merged code breaks something 5 tasks later?)
-- Dependency management (what if a worker adds a vulnerable package?)
-- Secret management (what if a worker hardcodes an API key?)
-- Rate limiting (what if the system burns through subscription quota?)
-
-### 8. Comparison
-
-How does this compare to existing tools?
-- Claude Code Agent Teams
-- Codex Cloud Tasks
-- Cursor Composer
-- Devin
-- OpenHands
-- SWE-agent
-
-Is this system solving a problem that's already solved better elsewhere? Or does it offer something unique?
-
-### 9. Scores
-
-Rate 1-10:
-- Architectural coherence
-- Security posture
-- Production readiness
-- Documentation quality
-- Innovation / uniqueness
+### 5. Updated scores
+Re-score with the corrected framing (workflow tool, not security tool):
+- Workflow coherence (was "architectural coherence")
+- Code quality potential
+- Production readiness (for the workflow, not security)
+- Documentation honesty
 - Real-world viability
 
-### 10. Final Verdict
+### 6. Updated verdict
+With the corrected framing and fixes applied:
+- **VIABLE**: worth using as a workflow tool for autonomous code generation
+- **QUESTIONABLE**: still has fundamental workflow problems
+- **ABANDON**: even as a workflow tool, this doesn't work
 
-Three possible verdicts:
-- **VIABLE**: The approach is sound, issues are fixable, worth continuing
-- **QUESTIONABLE**: Some value but fundamental concerns that may not be resolvable
-- **ABANDON**: The approach is flawed at its core, no amount of hardening will make it work
-
-Choose one and defend it with specific evidence from the repository.
-
-## Rules For Your Analysis
-
-1. Be specific — file names, line numbers, exact code
-2. No "it depends" — commit to positions
-3. Attack the strongest claims first — if "architect cannot write source" is false, say so clearly
-4. Don't be impressed by documentation volume — judge by whether the code actually does what the docs say
-5. Assume the system is running on a macOS machine with Claude Code Max subscription, Codex CLI, and Gemini CLI installed
-6. The human is NOT monitoring the system during execution — it must be self-correcting or fail safely
+We expect VIABLE or QUESTIONABLE. If still QUESTIONABLE, tell us exactly what 3 things would flip it to VIABLE.

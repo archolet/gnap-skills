@@ -244,21 +244,29 @@ They enforce a fixed contract:
 - reject unsupported passthrough flags
 - keep the architect from widening worker permissions ad hoc
 
-## Security model
+## Workflow discipline (not a security model)
 
-### What this system does claim
-- the architect cannot directly write source in normal operation
-- workers are isolated per task in dedicated git worktrees
-- raw worker CLI calls are blocked in the main project settings
-- subagents are denied
-- runtime control files are treated as immutable during a build
-- build/test acceptance happens before integration
+This system is a **workflow tool**. It provides structure and discipline, not OS-level isolation.
 
-### What this system does not claim
-- perfect containment across every external CLI
-- protection equivalent to an OS-level mandatory access control system
-- zero-risk unattended operation on every stack
-- that hooks alone are a sufficient security boundary
+### What it actually provides
+- Worktree-per-task keeps bad code off the main branch until reviewed
+- ff-only merge makes integration explicit and auditable
+- Wrapper scripts standardize worker dispatch
+- Hooks remind the architect of the intended workflow and catch common mistakes
+- Build/test gates run before integration
+
+### What it does NOT provide
+- OS-level process isolation (workers share UID and filesystem)
+- Containment against a model that actively tries to bypass hooks
+- Hook enforcement for Codex or Gemini workers (they run outside Claude Code)
+- Cryptographic integrity verification
+- Protection equivalent to containers, VMs, or mandatory access control
+
+### Honest limitations
+- Hooks are regex-based speed bumps, not walls
+- The "architect cannot write source" claim is a workflow convention, not an enforced guarantee
+- Workers can technically chmod their way past readonly protections
+- The system relies on model cooperation, not containment
 
 ## State files
 

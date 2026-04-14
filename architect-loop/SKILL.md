@@ -462,29 +462,7 @@ This enables:
 - Metrics calculation
 - Recovery reasoning
 
-## Control plane integrity manifest
 
-At bootstrap, auto-build writes `.autonomy/integrity.json`:
-
-```json
-{
-  "generated_at": "2026-04-14T07:55:00Z",
-  "files": {
-    ".claude/settings.json": "sha256:abc...",
-    ".claude/hooks/architect-no-direct-write.sh": "sha256:def...",
-    ".claude/hooks/pre-bash-guard.sh": "sha256:ghi...",
-    ".claude/hooks/stop-guard.sh": "sha256:jkl...",
-    ".claude/bin/sonnet-worker.sh": "sha256:mno...",
-    ".claude/bin/codex-worker.sh": "sha256:pqr...",
-    ".claude/bin/gemini-worker.sh": "sha256:stu..."
-  }
-}
-```
-
-Before EACH task dispatch, verify these hashes. If ANY hash changed:
-- Someone (or something) modified the control plane
-- Set `execution.status = "awaiting_human"`
-- Do NOT continue
 
 ## Checkpoint rule
 
@@ -497,7 +475,7 @@ After every 5 completed tasks:
 5. Record `execution.last_checkpoint_at`
 6. Write checkpoint summary to `.autonomy/checkpoints/CP-<N>.md`
 7. Check architecture drift: compare actual directory structure against IMPLEMENTATION.md
-8. Verify control plane integrity hashes
+
 
 ## Resume behavior
 

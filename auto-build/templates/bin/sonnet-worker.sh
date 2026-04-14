@@ -83,7 +83,7 @@ fi
 
 TASK_PROMPT="$(cat "$PROMPT_PATH")"
 
-read -r -d '' WORKER_PROMPT <<EOF || true
+read -r -d '' WORKER_PROMPT <<'EOF' || true
 You are a GNAP worker running in an isolated git worktree.
 
 Task ID: $TASK_ID

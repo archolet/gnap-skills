@@ -235,9 +235,11 @@ Known limits:
    - ambiguous architecture decisions still require a person
    - repeated failed attempts should stop, not churn forever
 
-4. **Hooks are not a sufficient boundary by themselves**
-   - they reinforce behavior
-   - they do not replace proper isolation
+4. **Hooks are workflow guides, not security boundaries**
+   - they remind the model of the intended workflow
+   - they catch common mistakes
+   - they do NOT provide OS-level isolation
+   - a model that wants to bypass them can find ways
 
 5. **Supervisor is operational glue, not a scheduler**
    - it can relaunch a named session
