@@ -141,6 +141,8 @@ Create:
 - `.autonomy/prompts/`
 - `.autonomy/results/`
 - `.autonomy/worktrees/`
+- `.autonomy/checkpoints/`
+- `.autonomy/feedback/`
 - `.claude/`
 - `.claude/hooks/`
 - `.claude/bin/`

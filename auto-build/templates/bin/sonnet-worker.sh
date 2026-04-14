@@ -81,34 +81,34 @@ if [ -d "$WORKTREE_DIR/.autonomy" ]; then
   chmod -R a-w "$WORKTREE_DIR/.autonomy" || true
 fi
 
+# Build worker prompt via temp file (safe interpolation without heredoc injection risk)
 TASK_PROMPT="$(cat "$PROMPT_PATH")"
+WORKER_PROMPT_FILE="$(mktemp "${TMPDIR:-/tmp}/gnap-worker-XXXXXX")"
 
-read -r -d '' WORKER_PROMPT <<'EOF' || true
-You are a GNAP worker running in an isolated git worktree.
+printf '%s\n' "You are a GNAP worker running in an isolated git worktree." > "$WORKER_PROMPT_FILE"
+printf '\n%s\n' "Task ID: ${TASK_ID}" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "Worktree: ${WORKTREE_DIR}" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "Branch: ${BRANCH}" >> "$WORKER_PROMPT_FILE"
+printf '\n%s\n' "Rules:" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Work only inside this worktree." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Never edit .claude/, .autonomy/, or .git/ paths." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Change only the files required for this task." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Run relevant validation commands if feasible." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Stage and commit your changes before finishing." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Use a commit message that starts with: worker(${TASK_ID}):" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Do not spawn subagents." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- Do not call another model CLI." >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- If you change production code, you MUST write or update tests." >> "$WORKER_PROMPT_FILE"
+printf '\n%s\n' "User task:" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "${TASK_PROMPT}" >> "$WORKER_PROMPT_FILE"
+printf '\n%s\n' "At the end, return:" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- a concise summary" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- changed files" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- commands you ran" >> "$WORKER_PROMPT_FILE"
+printf '%s\n' "- the final commit SHA" >> "$WORKER_PROMPT_FILE"
 
-Task ID: $TASK_ID
-Worktree: $WORKTREE_DIR
-Branch: $BRANCH
-
-Rules:
-- Work only inside this worktree.
-- Never edit .claude/, .autonomy/, or .git/ paths.
-- Change only the files required for this task.
-- Run relevant validation commands if feasible.
-- Stage and commit your changes before finishing.
-- Use a commit message that starts with: worker($TASK_ID):
-- Do not spawn subagents.
-- Do not call another model CLI.
-
-User task:
-$TASK_PROMPT
-
-At the end, return:
-- a concise summary
-- changed files
-- commands you ran
-- the final commit SHA
-EOF
+WORKER_PROMPT="$(cat "$WORKER_PROMPT_FILE")"
+rm -f "$WORKER_PROMPT_FILE"
 
 set +e
 (

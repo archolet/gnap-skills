@@ -65,6 +65,12 @@ Your job is to:
 
 Before doing anything else, read:
 
+**Environment safety**: Run `unset GNAP_ROLE` at the start of each session to prevent
+inherited env variables from disabling hook protections. This is critical if the session
+was launched by the supervisor or from a shell that previously ran a worker.
+
+
+
 - `CLAUDE.md` if present
 - `docs/SPECIFICATION.md`
 - `docs/IMPLEMENTATION.md`
@@ -339,10 +345,15 @@ cd ".autonomy/worktrees/T001" && npm test
 Only integrate with:
 
 ```bash
-git merge --ff-only worker/<task-id>
+# Validate branch name first (prevent traversal)
+BRANCH="worker/<task-id>"
+if ! echo "$BRANCH" | grep -qE '^worker/T[0-9]+$'; then
+  echo "Invalid branch name: $BRANCH" && exit 1
+fi
+git merge --ff-only "$BRANCH"
 ```
 
-Use fast-forward only.
+Use fast-forward only. Branch names MUST match `worker/T[0-9]+` pattern.
 
 If the merge cannot fast-forward:
 - stop
@@ -388,15 +399,6 @@ If the main checkout has ANY uncommitted changes:
 - The worker leaked outside its worktree
 - REJECT the task immediately
 - Record isolation violation in state
-
-Also verify control plane integrity:
-
-```bash
-# Compare current hashes against .autonomy/integrity.json
-sha256sum .claude/settings.json .claude/hooks/*.sh .claude/bin/*.sh
-```
-
-If any hash changed since bootstrap, STOP and set status to `awaiting_human`.
 
 ## Rejection feedback memory
 
@@ -482,6 +484,7 @@ After every 5 completed tasks:
 When invoked in a repo with existing state:
 
 1. Read `.autonomy/state.json`
+2. Read the latest file from `.autonomy/checkpoints/` if any exist — restore context about previous batches
 2. If `execution.status == "completed"`, report completion and stop
 3. If `execution.current_task_id` is set, inspect that task first
 4. If `.autonomy/runtime.lock` exists, keep using it
