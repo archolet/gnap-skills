@@ -63,7 +63,8 @@ fi
 BASE_SHA="$(git rev-parse HEAD)"
 
 if git worktree list --porcelain | grep -q "^worktree $WORKTREE_DIR$"; then
-  git worktree remove --force "$WORKTREE_DIR" || true
+  chmod -R u+w "$WORKTREE_DIR" 2>/dev/null || true
+  git worktree remove --force "$WORKTREE_DIR" 2>/dev/null || true
 fi
 
 if git show-ref --verify --quiet "refs/heads/$BRANCH"; then

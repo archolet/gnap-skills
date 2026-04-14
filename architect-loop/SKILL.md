@@ -376,6 +376,116 @@ If the worker result is not acceptable:
    - `last_result_file`
    - `last_log_file`
 
+## Worker isolation verification (after every task)
+
+After the worker finishes but BEFORE merging, verify main checkout integrity:
+
+```bash
+git status --porcelain
+```
+
+If the main checkout has ANY uncommitted changes:
+- The worker leaked outside its worktree
+- REJECT the task immediately
+- Record isolation violation in state
+
+Also verify control plane integrity:
+
+```bash
+# Compare current hashes against .autonomy/integrity.json
+sha256sum .claude/settings.json .claude/hooks/*.sh .claude/bin/*.sh
+```
+
+If any hash changed since bootstrap, STOP and set status to `awaiting_human`.
+
+## Rejection feedback memory
+
+When rejecting a worker attempt, write feedback to `.autonomy/feedback/<task-id>.json`:
+
+```json
+{
+  "task_id": "T003",
+  "attempt": 1,
+  "worker": "sonnet",
+  "rejection_reason": "Missing import for datetime module",
+  "failing_gate": "build",
+  "files_involved": ["src/notetaker/db.py"],
+  "fix_hints": ["Always add imports at file top", "Verify with ruff"],
+  "timestamp": "2026-04-14T08:00:00Z"
+}
+```
+
+On the NEXT dispatch of the same task, include this feedback in the prompt file.
+This prevents the worker from repeating the same mistake.
+
+Note: feedback is task-based, not worker-based. All workers benefit from previous attempt errors.
+
+## Structured worker result schema
+
+When reviewing worker output, expect this structure in `.autonomy/results/<task-id>.<worker>.meta.json`:
+
+```json
+{
+  "task_id": "T003",
+  "worker": "sonnet",
+  "commit_sha": "abc123",
+  "files_created": ["src/notetaker/db.py"],
+  "files_modified": ["src/notetaker/__init__.py"],
+  "files_deleted": [],
+  "functions_added": ["create_note", "validate_title"],
+  "functions_modified": [],
+  "dependencies_added": [],
+  "tests_added": ["tests/test_db.py"],
+  "commands_run": ["pytest tests/", "ruff check ."],
+  "known_limitations": []
+}
+```
+
+Use this to speed up review — but still read the actual diff. Summary is a hint, not proof.
+
+## Event ledger
+
+Append every significant action to `.autonomy/events.ndjson` (one JSON per line):
+
+```json
+{"ts":"2026-04-14T08:00:00Z","event":"task_selected","task_id":"T001","worker":"sonnet"}
+{"ts":"2026-04-14T08:01:30Z","event":"worker_dispatched","task_id":"T001","worker":"sonnet","prompt_file":".autonomy/prompts/T001.md"}
+{"ts":"2026-04-14T08:03:00Z","event":"worker_finished","task_id":"T001","exit_code":0}
+{"ts":"2026-04-14T08:03:30Z","event":"review_accepted","task_id":"T001","commit":"abc123"}
+{"ts":"2026-04-14T08:03:31Z","event":"merged","task_id":"T001","commit":"abc123"}
+```
+
+Event types: `task_selected`, `worker_dispatched`, `worker_finished`, `review_accepted`, `review_rejected`, `gate_failed`, `merged`, `blocked`, `checkpoint_written`, `isolation_violation`
+
+This enables:
+- Post-mortem analysis
+- Metrics calculation
+- Recovery reasoning
+
+## Control plane integrity manifest
+
+At bootstrap, auto-build writes `.autonomy/integrity.json`:
+
+```json
+{
+  "generated_at": "2026-04-14T07:55:00Z",
+  "files": {
+    ".claude/settings.json": "sha256:abc...",
+    ".claude/hooks/architect-no-direct-write.sh": "sha256:def...",
+    ".claude/hooks/pre-bash-guard.sh": "sha256:ghi...",
+    ".claude/hooks/stop-guard.sh": "sha256:jkl...",
+    ".claude/bin/sonnet-worker.sh": "sha256:mno...",
+    ".claude/bin/codex-worker.sh": "sha256:pqr...",
+    ".claude/bin/gemini-worker.sh": "sha256:stu..."
+  }
+}
+```
+
+Before EACH task dispatch, verify these hashes. If ANY hash changed:
+- Someone (or something) modified the control plane
+- Set `execution.status = "awaiting_human"`
+- Do NOT continue
+
 ## Checkpoint rule
 
 After every 5 completed tasks:
@@ -385,6 +495,9 @@ After every 5 completed tasks:
 3. Re-scan the last 5 merged diffs
 4. Run smoke commands if configured
 5. Record `execution.last_checkpoint_at`
+6. Write checkpoint summary to `.autonomy/checkpoints/CP-<N>.md`
+7. Check architecture drift: compare actual directory structure against IMPLEMENTATION.md
+8. Verify control plane integrity hashes
 
 ## Resume behavior
 
