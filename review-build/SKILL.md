@@ -1,143 +1,174 @@
 ---
 name: review-build
 description: >
-  Opus 1M full codebase audit. Reviews all code after autonomous build, standardizes
-  multi-model output, checks security/performance/architecture. Language-agnostic analysis
-  with stack-specific tool integration.
-  Triggers: "review build", "code review", "architect review", "audit code",
-  "standardize", "quality check"
+  Full-codebase post-build audit. Review the merged autonomous changes, verify architecture,
+  security, correctness, and consistency, and produce a written review report without relying
+  on any legacy .gnap paths.
 user-invocable: true
 disable-model-invocation: true
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - Glob
+  - Grep
 ---
 
-# Architect Review — Opus 1M Full Codebase Audit
+# Review Build
 
-You (Opus 4.6 1M) review the ENTIRE codebase after autonomous development.
-Multiple models may have written code — standardize and verify everything.
+You are performing a **post-build audit** of the current codebase.
 
-## When to Use
+This skill is for:
+- reviewing autonomous output after `/architect-loop`
+- reviewing the whole codebase before release
+- writing a formal audit report
+- finding architectural drift, unsafe patterns, and quality regressions
 
-- After `/architect-loop` completes all tasks
-- After any significant autonomous development session
-- Before a release or deployment
+This skill is **not** the main implementation loop.
 
-## Review Flow
+## Read first
 
-### Step 1: Map All Changes
+Read:
+
+- `CLAUDE.md`
+- `docs/SPECIFICATION.md`
+- `docs/IMPLEMENTATION.md`
+- `docs/TASKS.md`
+- `.autonomy/state.json`
+- `.autonomy/gates.json` if present
+
+Do **not** look for `.gnap/` paths.  
+This repo uses `.autonomy/` only.
+
+## Review goals
+
+Your review must cover:
+
+1. **Correctness**
+   - Does the code implement the documented behavior?
+   - Are acceptance criteria clearly satisfied?
+   - Are important edge cases handled?
+
+2. **Architecture**
+   - Do module boundaries match `docs/IMPLEMENTATION.md`?
+   - Is there layer leakage?
+   - Are there circular or suspicious dependencies?
+   - Did autonomous work introduce inconsistent patterns?
+
+3. **Security**
+   - Input validation
+   - injection risks
+   - secret handling
+   - unsafe shell/file operations
+   - auth / access control mistakes
+   - trust-boundary mistakes
+
+4. **Consistency**
+   - naming
+   - imports
+   - error handling
+   - logging style
+   - configuration strategy
+   - testing style
+
+5. **Performance and operability**
+   - obviously wasteful I/O or loops
+   - N+1 style issues
+   - unnecessary rebuilds or repeated work
+   - poor retry/timeouts in network code
+   - missing operational safeguards
+
+## Review flow
+
+### Step 1 — Map the autonomous run
+
+Use Git and `.autonomy/state.json` to understand what changed.
+
+Useful commands:
 
 ```bash
-# See all commits from autonomous development
-git log --oneline --since="24 hours ago"
-git diff --stat HEAD~N  # N = number of commits to review
+git log --oneline --decorate --graph -n 30
+git diff --stat HEAD~10..HEAD
+git diff --name-only HEAD~10..HEAD
 ```
 
-Read every changed file with the Read tool. You have 1M context — use it.
+If the autonomous run is shorter or longer, adjust the commit window accordingly.
 
-Also check `.autonomy/state.json` for task results and any failures.
+### Step 2 — Read the changed files
 
-### Step 2: Read Review History (if available)
+Read every changed file directly.
 
-Check if any review files exist:
-```bash
-ls .autonomy/reviews/ 2>/dev/null || echo "No review history"
-ls .gnap/reviews/ 2>/dev/null || echo "No GNAP reviews"
+Do not rely only on `git diff --stat`.  
+Use the file contents.
+
+### Step 3 — Compare against the docs
+
+For each significant change, ask:
+
+- Does it match `docs/SPECIFICATION.md`?
+- Does it match `docs/IMPLEMENTATION.md`?
+- Does it obey `CLAUDE.md`?
+- Does it complete the intended task from `docs/TASKS.md`?
+
+### Step 4 — Run stack-aware validation
+
+If `.autonomy/gates.json` exists, use its commands.
+
+Otherwise infer reasonable read-only validation commands from the stack, such as:
+
+- Node: `npm run lint`, `npm run build`, `npm test`
+- Python: `ruff check .`, `python3 -m pytest`
+- .NET: `dotnet build`, `dotnet test`
+- Go: `go build ./...`, `go test ./...`
+- Rust: `cargo build`, `cargo test`
+
+Capture failures clearly.
+
+### Step 5 — Write `docs/REVIEW_REPORT.md`
+
+Create a structured report with these sections:
+
+```md
+# Review Report
+
+## Scope
+## What was reviewed
+## Findings by severity
+### Critical
+### High
+### Medium
+### Low
+## Architecture notes
+## Security notes
+## Test/build notes
+## Recommended fixes
+## Final verdict
 ```
 
-Read any available review reports from previous sessions.
+Severity rules:
 
-### Step 3: Specialist Analysis
+- **Critical** = must fix before release
+- **High** = serious risk, should be fixed immediately
+- **Medium** = meaningful quality or maintainability issue
+- **Low** = polish or minor consistency issue
 
-For EVERY changed file, check:
+## Fix policy
 
-**3a. Security:**
-- Hardcoded secrets/passwords?
-- SQL injection risks?
-- Input validation present?
-- Unsafe file operations?
+Default behavior: **report, do not rewrite source code**.
 
-**3b. Code Standards:**
-- Naming conventions consistent across ALL files?
-- Import ordering correct? (stdlib → third-party → local)
-- Docstrings consistent? (same style everywhere)
-- Error handling pattern uniform? (every module same approach)
-- Magic numbers/strings? (should be constants)
+You may write or edit:
+- `docs/REVIEW_REPORT.md`
+- other review notes under `docs/`
 
-**3c. Architecture:**
-- Module boundaries respected? (no layer skipping)
-- Circular dependencies?
-- Matches IMPLEMENTATION.md design?
-- Follows CLAUDE.md rules?
-- DRY violations? (duplicate code across files)
+Do not edit application source unless the user explicitly asks for fixes after the audit.
 
-**3d. Performance:**
-- Unnecessary loops?
-- Loading entire files into memory?
-- N+1 query problems?
-- Unnecessary I/O?
+## Final output
 
-### Step 4: Auto-Fix (Stack-Aware)
+Your final response must include:
 
-```bash
-# Detect stack and run appropriate tools:
-
-# Python:
-#   ruff check --fix src/ tests/ && ruff format src/ tests/
-#   mypy src/ --ignore-missing-imports
-
-# .NET:
-#   dotnet build && dotnet test
-#   dotnet format --verify-no-changes
-
-# Node/TypeScript:
-#   npm run lint -- --fix && npm run build
-#   npm test
-
-# Go:
-#   go vet ./... && golangci-lint run
-#   go test ./...
-```
-
-Fix issues you find:
-- Naming inconsistencies → standardize
-- Missing docstrings → add
-- Duplicate code → refactor
-- Import ordering → fix
-- Error handling → standardize
-
-### Step 5: Report and Commit
-
-Present findings in this format:
-
-```
-## Architect Review Report
-
-### Critical Issues (fixed)
-- [file:line] Issue description → fix applied
-
-### Warnings (presented to user)
-- [file:line] Warning description
-
-### Improvement Suggestions
-- Suggestion description
-
-### Statistics
-- Total files reviewed: N
-- Files modified: N
-- Issues fixed: N
-- Test status: PASSED/FAILED
-- Lint status: CLEAN/N errors
-```
-
-If fixes were applied:
-```bash
-git add -A
-git commit -m "architect review: standardization + quality fixes"
-```
-
-## Rules
-
-1. **Don't change logic** — Only standardization and quality fixes. Don't touch business logic.
-2. **Don't break tests** — All existing tests must keep passing. Never commit test-breaking changes.
-3. **Explain every fix** — State why in the commit message.
-4. **No big refactors** — This is review, not refactoring. Small targeted fixes only.
-5. **Reference IMPLEMENTATION.md** — Architectural decisions are documented there.
+- the number of files reviewed
+- the highest severity found
+- whether build/test gates passed
+- whether the repo is release-ready, conditionally ready, or not ready
+- the path to `docs/REVIEW_REPORT.md`

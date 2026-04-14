@@ -4,7 +4,7 @@ How to write IMPLEMENTATION.md — the technical blueprint that translates the s
 into **how** the project will be built. This document makes all architecture decisions,
 recommends design patterns, defines concrete structures, and includes code sketches.
 
-**Before generating:** Also read `${CLAUDE_SKILL_DIR}/references/design-patterns.md` to select patterns.
+**Before generating:** Also read `${CLAUDE_PLUGIN_ROOT}/references/design-patterns.md` to select patterns.
 
 ## Principles
 
@@ -75,7 +75,7 @@ monolith vs services, dependency philosophy.]
 
 ## 2. Design Patterns
 
-[Consult ${CLAUDE_SKILL_DIR}/references/design-patterns.md. For each recommended pattern, show how it applies.]
+[Consult ${CLAUDE_PLUGIN_ROOT}/references/design-patterns.md. For each recommended pattern, show how it applies.]
 
 ### 2.1 Architectural Pattern: [Pattern Name]
 

@@ -1,46 +1,174 @@
-# GNAP Skills — Autonomous Multi-Agent Development for Claude Code
+# GNAP Skills
 
-Three Claude Code skills that turn Opus 4.6 1M into a software architect orchestrating multiple AI models. Includes enforcement hooks, session recovery, crash supervisor, and multi-stack support.
+Multi-stage Claude Code skills for running an **architect-led autonomous build loop** with explicit runtime controls.
+
+The central idea is simple:
+
+- **Opus 1M stays in your terminal as the architect**
+- the architect **does not write application source directly**
+- the architect dispatches one task at a time to a **fixed worker wrapper**
+- each worker runs in an **isolated git worktree**
+- the architect reviews the worker branch, runs gates, and only then integrates it
+
+This repo contains three skills:
+
+- `/auto-build` — planning + runtime bootstrap
+- `/architect-loop` — task dispatch, review, gates, integration
+- `/review-build` — post-build audit
+
+## What changed in this design
+
+This version is intentionally stricter than earlier iterations.
+
+### The old weak points
+Earlier versions had several structural problems:
+
+- raw `claude -p *` was allowed
+- `Agent` was still available as a bypass path
+- `state.json` could be created empty
+- stop protection depended on that empty state file
+- the supervisor expected a session identifier that was never created
+- a brittle background heartbeat required permissions that did not actually match
+- review flow still referenced legacy `.gnap/` paths
+- hooks were treated like the main boundary even though the actual hardening needed stronger isolation
+
+### The current design
+This version changes the model:
+
+- **Wrappers are mandatory** for worker dispatch
+- **Raw worker CLIs are denied** in project permissions
+- **Agent/subagent use is denied**
+- **State is derived from tasks**, never written as an empty placeholder
+- **The supervisor creates and reuses a resumable session reference**
+- **No background heartbeat loops**
+- **Review flow uses `.autonomy/` only**
+- **Worktree isolation is the primary boundary**
+- **Hooks are defense-in-depth, not the only guardrail**
 
 ## Architecture
 
-```
-Human (strategic decisions, final approval)
-  └── Opus 4.6 1M (architect — YOUR terminal session)
-      ├── Claude Sonnet 4.6 (fast developer — claude -p subprocess)
-      ├── Claude Opus 4.6 200K (strong developer — claude -p subprocess)
-      ├── Codex GPT-5.4 xhigh (OpenAI developer — codex exec)
-      └── Gemini 3.1 flash-lite (Google developer — gemini -p)
+```text
+Human
+└── Opus 1M (architect, main Claude Code session)
+    ├── reads docs + task/state/gate files
+    ├── dispatches through fixed wrappers only
+    ├── reviews worker branches
+    ├── runs gates in worker worktrees
+    └── merges only approved worker branches with --ff-only
+
+Worker wrappers
+├── .claude/bin/sonnet-worker.sh   -> claude -p (fixed flags)
+├── .claude/bin/codex-worker.sh    -> codex exec (fixed flags)
+└── .claude/bin/gemini-worker.sh   -> gemini -p (fixed flags)
+
+Runtime data
+├── .autonomy/tasks.json
+├── .autonomy/state.json
+├── .autonomy/gates.json
+├── .autonomy/runtime.lock
+└── .autonomy/session_id
 ```
 
-**Key principle**: Opus 1M is the orchestrator, NOT a separate daemon. It dispatches tasks to worker models, reviews every line of code with full 1M context, enforces build/test gates, and approves or rejects.
+## Core principles
+
+1. **The architect is an orchestrator**
+   - It selects tasks, reviews diffs, and enforces gates
+   - It does not directly author source files in the main checkout
+
+2. **Workers operate in isolated git worktrees**
+   - One task, one worktree, one worker attempt
+   - Main checkout stays clean until the architect accepts the branch
+
+3. **Integration is narrow**
+   - No `git apply`
+   - No patch injection into the main checkout
+   - Only `git merge --ff-only worker/<task-id>`
+
+4. **State is explicit**
+   - task queue: `.autonomy/tasks.json`
+   - live execution state: `.autonomy/state.json`
+   - gates: `.autonomy/gates.json`
+
+5. **Hooks are not magic**
+   - Hooks help enforce architect behavior
+   - The primary protection is the wrapper + worktree model
+   - Optional Claude Code sandboxing protects the main Bash session where available
 
 ## Skills
 
-### `/architect-loop` — The Core Orchestrator
-Opus 1M reads the task list, dispatches to appropriate worker model, waits for completion, reviews code with 1M context, builds, tests, and approves or rejects.
+### `/auto-build`
+Use this first in a new or empty project.
 
-**Features:**
-- Hardened worker dispatch (--max-turns, --permission-mode dontAsk, granular --allowedTools)
-- Build/test gate enforcement (architect Step 6c — must pass before commit)
-- Destructive command blocking (PreToolUse hook)
-- Auto-lint after edits (PostToolUse hook)
-- Stop prevention while tasks pending (Stop hook)
-- Session recovery from `.autonomy/state.json`
-- Checkpoints every 5 tasks (app launch + smoke test)
-- Remote monitoring via `--remote-control`
-- Telegram notifications
+It does:
 
-### `/auto-build` — Plan + Build Pipeline
-End-to-end project creation from empty folder to running code.
+- discovery and planning
+- writes:
+  - `docs/SPECIFICATION.md`
+  - `docs/IMPLEMENTATION.md`
+  - `docs/TASKS.md`
+  - `CLAUDE.md`
+- installs:
+  - `.claude/hooks/*`
+  - `.claude/settings.json`
+  - `.claude/bin/*.sh`
+- generates:
+  - `.autonomy/tasks.json`
+  - `.autonomy/state.json`
+  - `.autonomy/gates.json`
 
-**Phases:**
-- A: Interactive discovery → SPECIFICATION.md → IMPLEMENTATION.md → TASKS.md
-- B: Runtime setup → hooks, settings.json, CLAUDE.md, .autonomy/ state
-- C: Autonomous build → triggers `/architect-loop`
+It stops after setup and tells you to run `/architect-loop`.
 
-### `/review-build` — Post-Build Audit
-Full codebase review after autonomous build. Security, performance, standards, architecture checks. Stack-agnostic with per-language tool integration.
+### `/architect-loop`
+This is the runtime orchestrator.
+
+It does:
+
+- choose the next eligible task
+- create a prompt file under `.autonomy/prompts/`
+- dispatch to one wrapper
+- review the worker branch
+- run lint/build/test gates in the worker worktree
+- accept with `git merge --ff-only`
+- persist state after every transition
+
+### `/review-build`
+Use this after autonomous implementation is complete.
+
+It does:
+
+- read the docs and runtime state
+- inspect recent diffs and changed files
+- run validation commands
+- write `docs/REVIEW_REPORT.md`
+
+## Repository layout
+
+```text
+gnap-skills/
+├── README.md
+├── VISION.md
+├── TESTING.md
+├── REVIEW_PROMPT.md
+├── architect-loop/
+│   └── SKILL.md
+├── auto-build/
+│   ├── SKILL.md
+│   ├── hooks/
+│   │   ├── architect-no-direct-write.sh
+│   │   ├── pre-bash-guard.sh
+│   │   ├── post-edit-lint.sh
+│   │   ├── stop-guard.sh
+│   │   └── notify-telegram.sh
+│   └── templates/
+│       ├── settings.json
+│       ├── autonomy-supervisor.sh
+│       └── bin/
+│           ├── sonnet-worker.sh
+│           ├── codex-worker.sh
+│           └── gemini-worker.sh
+└── review-build/
+    └── SKILL.md
+```
 
 ## Installation
 
@@ -50,183 +178,130 @@ cd gnap-skills
 bash scripts/install.sh
 ```
 
-Or manually:
-```bash
-cp -r architect-loop auto-build review-build ~/.claude/skills/
-```
+Or copy the three skills manually into `~/.claude/skills/`.
 
-## Quick Start
+## Typical workflow
 
+### 1. Bootstrap a project
 ```bash
-# New project from scratch
-mkdir my-project && cd my-project
-tmux new -s architect
-caffeinate -dims &
-claude --remote-control
-> /auto-build
-# ... interactive planning ...
-# ... autonomous build starts ...
-```
-
-```bash
-# Existing project with TASKS.md
+mkdir my-project
 cd my-project
-claude --remote-control
-> /architect-loop
+claude
+/auto-build
 ```
+
+At the end of `/auto-build`, the project should contain:
+
+- docs
+- runtime state
+- hooks
+- worker wrappers
+
+### 2. Start the architect loop
+```bash
+claude
+/architect-loop
+```
+
+### 3. Optional supervisor
+For unattended recovery of an already-started autonomous run:
+
+```bash
+bash .claude/bin/autonomy-supervisor.sh .
+```
+
+Important nuance:
+
+- the supervisor creates a named/resumable session reference in `.autonomy/session_id`
+- the first autonomous run still needs the architect session to be started intentionally
+- once the runtime is active, the supervisor can relaunch the named session if Claude exits unexpectedly
+
+### 4. Run a post-build audit
+```bash
+claude
+/review-build
+```
+
+## Worker wrappers
+
+The architect never runs raw worker CLIs directly.
+
+Allowed dispatch surface:
+
+```bash
+.claude/bin/sonnet-worker.sh --task-id T001 --prompt-file .autonomy/prompts/T001.md
+.claude/bin/codex-worker.sh --task-id T001 --prompt-file .autonomy/prompts/T001.md
+.claude/bin/gemini-worker.sh --task-id T001 --prompt-file .autonomy/prompts/T001.md
+```
+
+### Why wrappers exist
+They enforce a fixed contract:
+
+- create/recreate the task worktree
+- run the worker in that worktree
+- keep control files out of scope
+- capture results under `.autonomy/results/`
+- reject unsupported passthrough flags
+- keep the architect from widening worker permissions ad hoc
+
+## Security model
+
+### What this system does claim
+- the architect cannot directly write source in normal operation
+- workers are isolated per task in dedicated git worktrees
+- raw worker CLI calls are blocked in the main project settings
+- subagents are denied
+- runtime control files are treated as immutable during a build
+- build/test acceptance happens before integration
+
+### What this system does not claim
+- perfect containment across every external CLI
+- protection equivalent to an OS-level mandatory access control system
+- zero-risk unattended operation on every stack
+- that hooks alone are a sufficient security boundary
+
+## State files
+
+### `.autonomy/tasks.json`
+Canonical parsed task queue.
+
+### `.autonomy/state.json`
+Live execution state. Generated from `tasks.json`, not from an empty template.
+
+### `.autonomy/gates.json`
+Stack-aware lint/build/test/smoke commands.
+
+### `.autonomy/runtime.lock`
+Present only while the autonomous loop is actively running.
+
+### `.autonomy/session_id`
+A resumable session reference created by the supervisor.
 
 ## Requirements
 
 ### Required
-- Claude Code v2.1+ with Opus 4.6 1M model (Max subscription)
-- tmux (persistent terminal sessions)
-- caffeinate (macOS — prevents sleep)
-- jq (JSON processing in hooks)
+- Claude Code
+- `jq`
+- `git`
+- Bash
+- a clean Git worktree model
 
-### Optional (multi-model orchestration)
-- Codex CLI (`npm install -g @openai/codex`) — OpenAI developer perspective
-- Gemini CLI (`npm install -g @google/gemini-cli`) — Google developer perspective
-- Chrome MCP extension — browser-based checkpoint testing
-- Telegram Bot — remote notifications (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` env vars)
+### Optional
+- Codex CLI
+- Gemini CLI
+- `caffeinate` on macOS
+- Telegram bot credentials for notifications
 
-### Notes
-- Skills work with Claude models only (Sonnet + Opus 200K as workers)
-- Codex and Gemini add multi-vendor perspective but are NOT required
-- No external pip packages required — all orchestration is via Claude Code + hooks
-- No GNAP dependency — task queue parsed directly from TASKS.md
-- Windows: Use WSL2 for tmux/caffeinate; hooks use bash
+## Current posture
 
-## Enforcement Hooks
+This repo is aimed at **controlled autonomous development**, not blind “run forever” autonomy.
 
-Unlike prompt-based instructions, hooks are **deterministic** — they ENFORCE rules rather than suggest them.
+The design is intentionally conservative:
 
-| Hook | Script | Action | Exit Code |
-|------|--------|--------|-----------|
-| PreToolUse | `architect-no-direct-write.sh` | Block architect from writing source code | 2 = BLOCK |
-| PreToolUse | `pre-bash-guard.sh` | Block `rm -rf`, `sudo`, `git reset --hard` | 2 = BLOCK |
-| PostToolUse | `post-edit-lint.sh` | Auto-lint Python/TS/C#/Go files | 0 (observe only) |
-| Stop | `stop-guard.sh` | Don't stop while tasks pending | 2 = CONTINUE |
-| Notification | `notify-telegram.sh` | Send Telegram alerts | 0 |
+- explicit docs first
+- explicit task graph
+- explicit runtime state
+- explicit wrapper surface
+- explicit review and gate steps
 
-**Note**: Build/test gate is enforced in architect-loop Step 6c, not via TaskCompleted hook.
-The architect explicitly runs build+test and refuses to commit if they fail.
-
-### How hooks are installed
-`/auto-build` Phase B copies hook scripts to your project's `.claude/hooks/` and generates `.claude/settings.json` with hook configuration. Hooks are project-specific and version-controlled.
-
-## Worker Hardening
-
-Worker `claude -p` calls use strict limits:
-
-```bash
-claude -p "$PROMPT" \
-  --model claude-sonnet-4-6 \
-  --output-format stream-json \
-  --max-turns 80 \
-  --permission-mode dontAsk \
-  --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git diff *),Bash(npm test *),..."
-```
-
-- `--max-turns 80` — prevent infinite loops
-- `--permission-mode dontAsk` — deny instead of hang on permission requests
-- `--allowedTools` — granular: `Bash(git diff *)` not just `Bash`
-- `--output-format stream-json` — parent can monitor worker events in real-time
-
-## Session Recovery
-
-State is persisted to `.autonomy/state.json` after every task:
-
-```json
-{
-  "current_task_index": 5,
-  "tasks": [
-    {"id": "T001", "status": "done", "commit_sha": "abc123", "build_result": "pass"}
-  ],
-  "stats": {"done": 5, "total": 35}
-}
-```
-
-If Claude Code crashes and restarts, `/architect-loop` reads this file and resumes from the last completed task.
-
-## Crash Recovery (Supervisor)
-
-For unattended operation:
-
-```bash
-tmux new -s architect
-bash auto-build/templates/autonomy-supervisor.sh ~/Desktop/my-project
-```
-
-The supervisor:
-- Wraps Claude Code with `caffeinate`
-- Auto-restarts on crash (up to 5 times)
-- Checks `.autonomy/state.json` for progress
-- Sends Telegram alerts on restart/completion
-- Exits when all tasks are done
-
-## Remote Monitoring
-
-```bash
-claude --remote-control
-```
-
-Connect from phone or browser via the URL Claude Code provides. Monitor task progress without sitting at the desk.
-
-## Autonomy Levels
-
-| Level | Description | Requirements |
-|-------|-------------|--------------|
-| **High** | Works reliably with periodic human checks | Skills + hooks installed |
-| **Session-scoped** | Unattended while Claude Code session lives | + tmux + caffeinate |
-| **Controlled full** | Survives crashes, resumes automatically | + supervisor + state recovery |
-
-See [TESTING.md](TESTING.md) for the full acceptance test matrix.
-
-## Multi-Stack Support
-
-Hooks auto-detect project stack:
-
-| Stack | Build | Test | Lint |
-|-------|-------|------|------|
-| Node/TypeScript | `npm run build` | `npm test` | prettier |
-| Python | — | `pytest` | ruff |
-| .NET | `dotnet build` | `dotnet test` | dotnet format |
-| Go | `go build ./...` | `go test ./...` | gofmt |
-| Rust | `cargo build` | `cargo test` | — |
-
-## File Structure
-
-```
-gnap-skills/
-├── README.md                          # This file
-├── TESTING.md                         # Acceptance test matrix
-├── architect-loop/
-│   └── SKILL.md                       # Core orchestrator skill
-├── auto-build/
-│   ├── SKILL.md                       # Plan + build pipeline
-│   ├── hooks/                         # Enforcement hook scripts
-│   │   ├── pre-bash-guard.sh          # Block destructive commands
-│   │   ├── post-edit-lint.sh          # Auto-lint after edits
-│   │   ├── architect-no-direct-write.sh # Block direct source code writing
-│   │   ├── stop-guard.sh             # Prevent premature stop
-│   │   └── notify-telegram.sh        # Telegram notifications
-│   ├── templates/                     # Project bootstrap templates
-│   │   ├── settings.json             # Hook configuration
-│   │   ├── detect-stack.sh           # Stack auto-detection
-│   │   └── autonomy-supervisor.sh    # Crash recovery supervisor
-│   └── references/                    # Planning guides (8 files)
-├── review-build/
-│   └── SKILL.md                       # Post-build audit skill
-└── scripts/
-    └── install.sh                     # One-command installation
-```
-
-## Documentation
-
-- **[VISION.md](VISION.md)** — Full architecture, design decisions, limitations, and what this is NOT
-- **[TESTING.md](TESTING.md)** — 10 acceptance tests, autonomy levels, stack coverage requirements
-- **[REVIEW_PROMPT.md](REVIEW_PROMPT.md)** — Deep analysis request for cross-model review
-
-## License
-
-MIT
+Read `VISION.md` for the design rationale and `TESTING.md` for the validation matrix.

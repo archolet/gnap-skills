@@ -1,115 +1,276 @@
-# GNAP Skills — Vision & Architecture
+# GNAP Skills — Vision
 
-## What Are We Building?
+## The goal
 
-An autonomous software development system where **you open a terminal, describe a project, and AI builds it** — with multiple AI models from different vendors working together under a single architect.
+Build a practical autonomous development loop where:
 
-The core idea: **Claude Opus 4.6 (1M context)** sits in your terminal as the **software architect**. It doesn't write code. Instead, it:
+- the human stays responsible for strategy
+- Claude Opus 1M stays in the terminal as the architect
+- implementation work is delegated to smaller or alternate workers
+- every accepted code change passes through an explicit review and gate step
 
-1. Plans the project (specs, implementation docs, task breakdown)
-2. Dispatches coding tasks to **worker models** (Sonnet, Codex GPT-5.4, Gemini)
-3. Reviews every line of code the workers produce (with full 1M context)
-4. Runs build + test — refuses to accept broken code
-5. Commits only what passes quality gates
-6. Moves to the next task until the project is complete
+This is **not** a claim that one prompt turns Claude Code into a safe daemon.  
+It is a claim that a careful runtime model can make autonomous development **much more controlled**.
 
-## Why Multiple Models?
+## The current architectural stance
 
-No single AI model is perfect. Each has blind spots:
+Earlier versions leaned too heavily on prompt instructions and repository hooks.
 
-- **Claude Sonnet 4.6** — Fast, good at boilerplate, but can be shallow on complex logic
-- **Claude Opus 4.6 200K** — Strong reasoning, but limited context compared to 1M
-- **Codex GPT-5.4** — Different vendor, different training, catches things Claude misses
-- **Gemini 3.1** — Third perspective, good at operational/infrastructure concerns
+That is not enough.
 
-The architect (Opus 1M) sees ALL their code. It catches inconsistencies between what different models wrote. It standardizes naming, error handling, and patterns across the entire codebase.
+The design in this repo now assumes:
 
-## Why Not Just Let One Model Do Everything?
+1. **Prompts are guidance**
+2. **Hooks are defense-in-depth**
+3. **The real operational boundary is the per-task worktree**
+4. **The architect’s worker dispatch surface must be fixed and narrow**
 
-We tried. In our first test, Opus 1M ignored the delegation instructions and wrote all 14 tasks itself. Result: 60 tests passed, code worked. But:
+That is why the current system uses:
 
-- Only one perspective — no cross-model review
-- All quota consumed by one model
-- In real projects (200+ files), context fills up
-- One model's biases become the whole codebase's biases
+- a canonical task queue
+- a canonical mutable state file
+- fixed worker wrappers
+- isolated git worktrees
+- explicit integration through fast-forward merge only
 
-## The Three-Phase Flow
+## The runtime roles
 
-```
-Phase A: Planning (interactive, human involved)
-  ├── /auto-build skill triggers
-  ├── Interactive Q&A about the project
-  ├── SPECIFICATION.md generated
-  ├── IMPLEMENTATION.md generated
-  ├── TASKS.md generated (ordered, with dependencies)
-  ├── CLAUDE.md generated (project rules)
-  └── Human approves each document
+### Human
+Responsible for:
 
-Phase B: Runtime Setup (automatic)
-  ├── TASKS.md parsed into .autonomy/tasks.json
-  ├── Enforcement hooks installed (.claude/hooks/)
-  ├── settings.json configured
-  ├── Git initialized
-  └── "Run /architect-loop to start" — STOPS HERE
+- product direction
+- approvals at planning time
+- conflict resolution when the docs are ambiguous
+- handling blocked tasks or strategic changes
 
-Phase C: Autonomous Build (human triggers /architect-loop)
-  ├── Opus 1M reads task queue
-  ├── Selects appropriate worker model for each task
-  ├── Dispatches via claude -p / codex exec / gemini -p
-  ├── CANNOT write source code directly (hook blocks it)
-  ├── Reviews every diff with 1M context
-  ├── Runs build + test (MUST pass before commit)
-  ├── Every 5 tasks: launches app + smoke test
-  ├── Session state saved to .autonomy/state.json
-  └── Telegram notifications for progress
-```
+### Architect (Opus 1M)
+Responsible for:
 
-## Enforcement, Not Suggestions
+- reading the full plan
+- selecting the next task
+- choosing the worker
+- reviewing the worker result
+- running gates
+- accepting or rejecting the branch
+- maintaining execution state
 
-Previous versions used prompt-level instructions: "please run build after each task." The model could ignore them — and did.
+The architect is **not** supposed to author source code directly in the main checkout.
 
-Current version uses **deterministic hooks**:
+### Workers
+Workers are interchangeable implementation engines.
 
-| What | How | Enforcement |
-|------|-----|-------------|
-| Architect can't write source code | `architect-no-direct-write.sh` | PreToolUse exit 2 = BLOCKED |
-| No destructive commands | `pre-bash-guard.sh` | PreToolUse exit 2 = BLOCKED |
-| Auto-lint after edits | `post-edit-lint.sh` | PostToolUse (automatic) |
-| Can't stop with pending tasks | `stop-guard.sh` | Stop exit 2 = CONTINUE |
-| Build gate | architect-loop Step 6c | Architect explicitly runs build+test |
+Current wrappers target:
 
-The architect **physically cannot** write to `src/` or `tests/` directories. If it tries, the hook blocks it and says: "Dispatch to a worker model."
+- Claude Sonnet
+- Codex CLI
+- Gemini CLI
 
-## Session Recovery
+A worker receives:
 
-If Claude Code crashes:
-- `.autonomy/state.json` records which tasks are done
-- On restart, `/architect-loop` reads the state file
-- Asks: "Previous session: 5/14 done. Resume?"
-- Continues from where it left off
+- one task
+- one prompt file
+- one isolated worktree
+- one completion contract
 
-## Autonomy Levels
+A worker should return:
 
-| Level | What it means | Requirements |
-|-------|---------------|--------------|
-| **High** | Works with periodic human checks | Skills + hooks installed |
-| **Session-scoped** | Unattended while session lives | + tmux + caffeinate |
-| **Controlled full** | Survives crashes, auto-restarts | + supervisor + state recovery |
+- code changes committed on its worker branch
+- a concise summary
+- enough evidence for the architect to review the attempt
 
-We don't claim "fully autonomous, zero problems." We claim: **high autonomy with deterministic safety rails, multi-model perspective, and measurable quality gates.**
+## The three phases
 
-## What This Is NOT
+### Phase A — Planning
+The user and Claude collaborate on:
 
-- **Not a replacement for human architects** — The human makes strategic decisions
-- **Not production-ready** — It's a development tool, not a deployment system
-- **Not magic** — Complex projects still need human judgment at key points
-- **Not guaranteed to work on every stack** — Tested on Python, .NET; others need validation
-- **Not a daemon** — The architect IS the Claude terminal session, not a background process
+- `docs/SPECIFICATION.md`
+- `docs/IMPLEMENTATION.md`
+- `docs/TASKS.md`
+- `CLAUDE.md`
 
-## Known Limitations
+This phase is interactive and explicit.
 
-1. **Idle timeout** — Claude Code may disconnect after ~5 minutes of no input (tmux helps)
-2. **Context accumulation** — 1M tokens is a lot but can fill on very large projects
-3. **Worker quality varies** — Some models produce better code for certain languages
-4. **No true crash-proof** — Supervisor restarts, but some state may be lost
-5. **Single machine** — Runs on one macOS machine, not distributed
+### Phase B — Runtime bootstrap
+The runtime is installed into the target project:
+
+- `.claude/hooks/*`
+- `.claude/settings.json`
+- `.claude/bin/*.sh`
+- `.autonomy/tasks.json`
+- `.autonomy/state.json`
+- `.autonomy/gates.json`
+
+Important principle:
+
+- `state.json` is **derived from** `tasks.json`
+- it is not a blank placeholder
+
+The runtime ends this phase in:
+
+- `execution.status = "ready"`
+
+It does **not** auto-start the build loop.
+
+### Phase C — Architect loop
+The user explicitly invokes `/architect-loop`.
+
+For each task, the architect:
+
+1. selects the next eligible task
+2. writes a task prompt file
+3. dispatches one wrapper
+4. reviews the worker branch
+5. runs gates in the worker worktree
+6. accepts or rejects the attempt
+7. updates state
+
+## Why wrappers matter
+
+A raw call like `claude -p ...` gives too much freedom to the architect session.
+
+A wrapper reduces that freedom.
+
+The wrapper decides:
+
+- how the worktree is created
+- which model command is used
+- which fixed flags are used
+- where results are written
+- what arguments are accepted
+
+This is why the architect is required to call:
+
+- `.claude/bin/sonnet-worker.sh`
+- `.claude/bin/codex-worker.sh`
+- `.claude/bin/gemini-worker.sh`
+
+and nothing else.
+
+## Why worktrees matter
+
+Hooks can help tell the architect what it should not do.
+
+But a direct source-write hook inside the same trust boundary is not enough on its own.
+
+A separate git worktree gives the system a more meaningful boundary:
+
+- worker changes land away from the main checkout
+- the main checkout remains unchanged until acceptance
+- the architect can review the branch before integration
+- bad attempts can be discarded without patching the main tree
+
+This is the key shift in the design.
+
+## Why the architect still matters
+
+The value of Opus 1M here is not “type all the code”.
+
+The value is:
+
+- seeing the whole project
+- enforcing consistency across tasks
+- comparing worker output against the docs
+- holding the build/test gate
+- integrating only what passes
+
+A smaller worker may generate code faster.  
+The architect keeps the overall system coherent.
+
+## State and recovery
+
+The system tracks its runtime through:
+
+- `.autonomy/tasks.json` — canonical task graph
+- `.autonomy/state.json` — mutable execution state
+- `.autonomy/gates.json` — gate commands
+- `.autonomy/runtime.lock` — active-run marker
+- `.autonomy/session_id` — resumable session reference
+
+Recovery is intentionally modest:
+
+- the supervisor can relaunch a named Claude session
+- the architect can resume from state
+- task completion and attempt history survive Claude exits
+
+What this does **not** mean:
+
+- perfect crash-proofing
+- zero lost context in every edge case
+- daemon-grade orchestration on every platform
+
+## What is fixed in this version
+
+This version specifically removes or addresses the major earlier flaws:
+
+- no `Agent` tool in the architect skill
+- no “do it yourself” carve-out for simple coding tasks
+- no raw `claude -p *` allowance in project settings
+- no blank `state.json`
+- no supervisor dependency on a never-created session identifier
+- no brittle heartbeat loop dependency
+- no legacy `.gnap/` path in review flow
+- hook logic closes common Bash write bypasses such as:
+  - `python3 -c`
+  - `sed -i`
+  - `perl -pi`
+  - `git apply`
+  - `cp`
+  - `mv`
+
+## What remains intentionally limited
+
+This repo is still an engineering tool, not a universal autonomy platform.
+
+Known limits:
+
+1. **External CLI variability**
+   - Codex and Gemini behavior can differ by version
+   - Their wrappers are useful, but less deterministic than Claude-native flows
+
+2. **Stack-specific gate quality**
+   - Good defaults are possible
+   - Perfect gate inference across every stack is unrealistic
+
+3. **Human escalation is real**
+   - ambiguous architecture decisions still require a person
+   - repeated failed attempts should stop, not churn forever
+
+4. **Hooks are not a sufficient boundary by themselves**
+   - they reinforce behavior
+   - they do not replace proper isolation
+
+5. **Supervisor is operational glue, not a scheduler**
+   - it can relaunch a named session
+   - it does not magically inject new intent into an unopened project
+
+## What this is
+
+This is a **controlled architect-led autonomous development runtime** with:
+
+- explicit planning
+- explicit task state
+- narrow worker dispatch
+- worktree isolation
+- explicit review gates
+
+## What this is not
+
+- not a replacement for human technical leadership
+- not proof that unattended coding is solved
+- not a secure sandbox for arbitrary external CLIs
+- not a production deployment system
+- not a background daemon that makes strategic decisions for you
+
+## Standard of success
+
+A successful run looks like this:
+
+- planning docs are clear
+- tasks are explicit
+- state is recoverable
+- the architect never bypasses the worker path
+- workers stay isolated per task
+- build and test gates are enforced before integration
+- the human can inspect progress and intervene when the docs stop being sufficient
+
+That is the level of autonomy this repo is trying to achieve.

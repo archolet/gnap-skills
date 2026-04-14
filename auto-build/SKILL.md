@@ -1,234 +1,352 @@
 ---
 name: auto-build
 description: >
-  End-to-end project planning and autonomous multi-agent development. Three phases:
-  (A) Interactive discovery → SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md,
-  (B) Runtime setup (hooks, state, task queue),
-  (C) Autonomous build with 5 AI agents.
-  Triggers: "plan project", "auto build", "build this project", "start from scratch",
-  "plan and build", "create new project"
+  Interactive plan-to-runtime bootstrap. Gather requirements, write the project documents,
+  derive the task queue, install hooks and worker wrappers, generate runtime state from tasks,
+  and stop after setup so the human can invoke /architect-loop explicitly.
 user-invocable: true
 disable-model-invocation: true
+allowed-tools:
+  - Bash
+  - Read
+  - Write
+  - Edit
+  - MultiEdit
+  - Glob
+  - Grep
 ---
 
-# Auto-Build: Plan → Build → Deliver
+# Auto Build
 
-Sıfırdan tam otonom proje geliştirme sistemi. Üç faz:
+This skill has **two** responsibilities:
 
+- **Phase A — Planning**: turn an idea into explicit implementation documents
+- **Phase B — Runtime bootstrap**: install the autonomous build runtime in the project
+
+This skill **does not** start the autonomous execution loop automatically.  
+It ends after setup and tells the user to run `/architect-loop`.
+
+## Non-negotiable rules
+
+1. Create clear, reviewable documents first.
+2. Generate a canonical machine-readable task queue.
+3. Generate `.autonomy/state.json` **from** `.autonomy/tasks.json`.
+4. Never create an empty placeholder state file.
+5. Install hooks, settings, supervisor, and wrappers before the build loop starts.
+6. Initialize Git before the first worker branch is created.
+7. Stop after setup. The human must explicitly invoke `/architect-loop`.
+
+## Output documents
+
+Write these files during planning:
+
+- `docs/SPECIFICATION.md`
+- `docs/IMPLEMENTATION.md`
+- `docs/TASKS.md`
+- `CLAUDE.md`
+
+Use `docs/` consistently.
+
+## Phase A — Planning
+
+### 1. Discovery
+Interview the user until these are clear:
+
+- product goal
+- target users
+- core workflows
+- constraints
+- stack preferences
+- non-functional requirements
+- deployment expectations
+- testing expectations
+
+### 2. Write `docs/SPECIFICATION.md`
+It must cover:
+
+- problem statement
+- goals
+- non-goals
+- user flows
+- functional requirements
+- non-functional requirements
+- external integrations
+- success criteria
+
+### 3. Write `docs/IMPLEMENTATION.md`
+It must cover:
+
+- chosen stack
+- repo layout
+- modules and boundaries
+- data model
+- API shape
+- background jobs if any
+- validation and error-handling patterns
+- testing strategy
+- build and run commands
+- deployment approach if relevant
+
+### 4. Write `CLAUDE.md`
+This is the project operating contract for future sessions.
+
+It must include:
+
+- coding style
+- naming conventions
+- error handling rules
+- testing expectations
+- forbidden shortcuts
+- architecture boundaries
+- task acceptance expectations
+
+### 5. Write `docs/TASKS.md`
+Use a format that is easy to parse deterministically.
+
+Required format:
+
+```md
+# Task Queue
+
+## T001 - Task title
+Summary: one short paragraph
+Depends on: none
+Acceptance:
+- item 1
+- item 2
+
+## T002 - Task title
+Summary: one short paragraph
+Depends on: T001
+Acceptance:
+- item 1
 ```
-/auto-build
-  │
-  ├── FAZ A: Keşif ve Planlama (interaktif, sen ve kullanıcı)
-  │   → Proje tanımı, tech stack, mimari kararlar
-  │   → SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md üretilir
-  │
-  ├── Phase B: Runtime Setup (automatic)
-  │   → TASKS.md → .autonomy/tasks.json parsed
-  │   → CLAUDE.md proje kurallarıyla yazılır
-  │
-  └── Phase C: Run /architect-loop (user triggers)
-      → 5 ajan: Claude Code (builder) + Sonnet/Opus/Codex/Gemini (reviewers)
-      → Her görev: build → test → review → commit
-      → Her faz: phase gate review
-      → Hata: escalation → retry
+
+Rules:
+
+- Task IDs are mandatory and stable
+- Use `T001`, `T002`, ...
+- Dependencies are explicit
+- Each task is small enough for one worker attempt
+- Put architecture work before leaf implementation work
+- Put tests close to the feature they validate
+
+## Phase B — Runtime bootstrap
+
+### 1. Create directories
+
+Create:
+
+- `.autonomy/`
+- `.autonomy/prompts/`
+- `.autonomy/results/`
+- `.autonomy/worktrees/`
+- `.claude/`
+- `.claude/hooks/`
+- `.claude/bin/`
+- `logs/`
+- `logs/workers/`
+
+### 2. Install runtime files from the skill repo
+
+Assume the installed skill lives at:
+
+```bash
+$HOME/.claude/skills/auto-build
 ```
 
-## Ajan Hiyerarşisi
+Copy these files into the target project in this order:
 
-```
-İnsan (orkestra şefi, stratejik kararlar)
-  └── Claude Opus 4.6 1M (sen — mimar, bu oturum)
-      ├── Claude Opus 4.6 200K (senior reviewer)
-      ├── Claude Sonnet 4.6 200K (senior reviewer, hızlı)
-      ├── Codex GPT-5.4 xhigh (reviewer, session memory)
-      └── Gemini 3.1 flash-lite (reviewer, farklı perspektif)
-```
+- `$HOME/.claude/skills/auto-build/hooks/architect-no-direct-write.sh` → `.claude/hooks/architect-no-direct-write.sh`
+- `$HOME/.claude/skills/auto-build/hooks/pre-bash-guard.sh` → `.claude/hooks/pre-bash-guard.sh`
+- `$HOME/.claude/skills/auto-build/hooks/post-edit-lint.sh` → `.claude/hooks/post-edit-lint.sh`
+- `$HOME/.claude/skills/auto-build/hooks/stop-guard.sh` → `.claude/hooks/stop-guard.sh`
+- `$HOME/.claude/skills/auto-build/hooks/notify-telegram.sh` → `.claude/hooks/notify-telegram.sh`
+- `$HOME/.claude/skills/auto-build/templates/autonomy-supervisor.sh` → `.claude/bin/autonomy-supervisor.sh`
+- `$HOME/.claude/skills/auto-build/templates/bin/sonnet-worker.sh` → `.claude/bin/sonnet-worker.sh`
+- `$HOME/.claude/skills/auto-build/templates/bin/codex-worker.sh` → `.claude/bin/codex-worker.sh`
+- `$HOME/.claude/skills/auto-build/templates/bin/gemini-worker.sh` → `.claude/bin/gemini-worker.sh`
 
----
+Mark scripts executable **before** installing the settings file:
 
-## FAZ A: Keşif ve Planlama
-
-Bu faz interaktiftir. Kullanıcıyla konuşarak projeyi anla.
-
-### Adım 1: Proje Kimliği
-
-Read `${CLAUDE_SKILL_DIR}/references/elicitation-guide.md` for the full question framework.
-
-Kullanıcıya sor (AskUserQuestion kullan):
-1. "Bu proje ne yapıyor?" (elevator pitch)
-2. "Kimin için?" (hedef kitle)
-3. Proje tipi: Web App / CLI / API / Mobile / Desktop
-4. Kapsam: MVP / Full Product / Enterprise
-5. Tech stack tercihi: "Biliyorum" / "Yardım et" / "Sen seç"
-
-**Tech stack yardımı gerekiyorsa:** Read `${CLAUDE_SKILL_DIR}/references/tech-stacks.md`
-
-### Adım 2: SPECIFICATION.md Üret
-
-Read `${CLAUDE_SKILL_DIR}/references/specification-guide.md` before generating.
-
-Projenin **ne** olduğunu tanımla. `./docs/SPECIFICATION.md` olarak kaydet.
-Kullanıcıya göster, onay al.
-
-### Adım 3: IMPLEMENTATION.md Üret
-
-Read `${CLAUDE_SKILL_DIR}/references/implementation-guide.md` AND `${CLAUDE_SKILL_DIR}/references/design-patterns.md`
-
-Projenin **nasıl** yapılacağını tanımla. Tech stack, dizin yapısı, modüller, API'ler.
-`./docs/IMPLEMENTATION.md` olarak kaydet. Kullanıcıya göster, onay al.
-
-### Adım 4: TASKS.md Üret
-
-Read `${CLAUDE_SKILL_DIR}/references/tasks-guide.md` before generating.
-
-IMPLEMENTATION.md'yi görevlere böl. Her görev:
-- Tek oturumda tamamlanabilir
-- Bağımlılık sırası belirli
-- Acceptance criteria machine-testable
-- Dosya listesi explicit
-
-**Task format (architect-loop compatible):**
-```markdown
-### Task N: Görev Başlığı
-
-**Description:** Ne yapılacak
-**Files to create:** dosya1.py, dosya2.py
-**Files to modify:** mevcut_dosya.py
-**Acceptance Criteria:**
-- [ ] `python -m pytest tests/ -v`
-- [ ] `ruff check src/`
-- [ ] Spesifik kontrol
-**Dependencies:** Task 1, Task 3
-**Phase:** 1
+```bash
+chmod 755 .claude/hooks/*.sh .claude/bin/*.sh
 ```
 
-`./docs/TASKS.md` olarak kaydet. Kullanıcıya göster, onay al.
+Copy the settings file last:
 
-### Adım 5: CLAUDE.md Üret
+- `$HOME/.claude/skills/auto-build/templates/settings.json` → `.claude/settings.json`
 
-Proje kök dizinine `CLAUDE.md` yaz. İçerik:
-- Kod standartları (dil spesifik)
-- Güvenlik kuralları (tehlikeli komutlar listesi)
-- Test kuralları
-- Git kuralları
-- Mimari kurallar (IMPLEMENTATION.md'den)
+### 3. Parse `docs/TASKS.md` into `.autonomy/tasks.json`
 
----
+The parsed structure must be deterministic and complete.
 
-## Phase B: Project Runtime Setup
-
-Runs automatically after user approves all documents.
-
-### Step 6: Parse TASKS.md into Task Queue
-
-Read `docs/TASKS.md` and convert each `### Task N: Title` block into a JSON object.
-Write the result to `.autonomy/tasks.json`:
+Required shape:
 
 ```json
 {
-  "project": "project-name",
+  "version": 2,
+  "generated_at": "2026-04-13T12:00:00Z",
+  "source": "docs/TASKS.md",
+  "tasks": [
+    {
+      "id": "T001",
+      "title": "Task title",
+      "summary": "One short paragraph",
+      "dependencies": [],
+      "acceptance_criteria": ["item 1", "item 2"]
+    }
+  ]
+}
+```
+
+### 4. Derive `.autonomy/state.json` from `.autonomy/tasks.json`
+
+Do **not** write a blank placeholder.
+
+The state file must be derived by mapping every parsed task into an execution record.
+
+Required shape:
+
+```json
+{
+  "version": 2,
+  "generated_at": "2026-04-13T12:00:00Z",
+  "execution": {
+    "status": "ready",
+    "session_ref": null,
+    "current_task_id": null,
+    "started_at": null,
+    "updated_at": "2026-04-13T12:00:00Z",
+    "last_checkpoint_at": null
+  },
+  "stats": {
+    "total": 10,
+    "done": 0,
+    "failed": 0,
+    "in_progress": 0
+  },
   "tasks": [
     {
       "id": "T001",
       "title": "Task title",
       "status": "pending",
-      "phase": 1,
       "dependencies": [],
-      "description": "...",
-      "files_to_create": [],
-      "acceptance_criteria": []
+      "attempt_count": 0,
+      "worker": null,
+      "branch": "worker/T001",
+      "worktree": ".autonomy/worktrees/T001",
+      "accepted_commit": null,
+      "last_error": null,
+      "last_summary_file": null,
+      "last_result_file": null,
+      "last_log_file": null
     }
-  ],
-  "current_task_index": 0,
-  "stats": {"total": 14, "done": 0}
+  ]
 }
 ```
 
-Also create `.autonomy/` directory:
-```bash
-mkdir -p .autonomy
+### 5. Write `.autonomy/gates.json`
+
+Detect the stack from the repo and write the gate file.
+
+Examples:
+
+#### Node / TypeScript
+```json
+{
+  "stack": "node",
+  "lint": ["npm run lint"],
+  "build": ["npm run build"],
+  "test": ["npm test"],
+  "smoke": []
+}
 ```
 
-No external dependencies needed — YOU parse the markdown directly.
-
-### Adım 7: Install Enforcement Hooks
-
-Create `.claude/hooks/` directory and copy hook scripts from skill templates.
-These hooks ENFORCE quality gates — they are not optional.
-
-```bash
-mkdir -p .claude/hooks
+#### Python
+```json
+{
+  "stack": "python",
+  "lint": ["ruff check ."],
+  "build": [],
+  "test": ["python3 -m pytest"],
+  "smoke": []
+}
 ```
 
-Copy these 5 hook scripts to `.claude/hooks/`:
-- `pre-bash-guard.sh` — Block destructive commands (rm -rf, sudo, git reset --hard)
-- `post-edit-lint.sh` — Auto-lint after file edits (Python/TS/C#/Go)
-- `architect-no-direct-write.sh` — Block architect from writing source code directly
-- `stop-guard.sh` — Prevent stop while pending tasks exist
-- `notify-telegram.sh` — Send Telegram alerts (if configured)
-
-The hook scripts are located at `${CLAUDE_SKILL_DIR}/hooks/`.
-Read each script from the skill directory and write it to `.claude/hooks/` in the project.
-Make all scripts executable: `chmod +x .claude/hooks/*.sh`
-
-Then create `.claude/settings.json` with hook configuration.
-Use the template from `${CLAUDE_SKILL_DIR}/templates/settings.json`.
-
-Also create `.autonomy/` directory for state management:
-```bash
-mkdir -p .autonomy
-echo '{"tasks":[],"current_task_index":0,"stats":{}}' > .autonomy/state.json
+#### .NET
+```json
+{
+  "stack": "dotnet",
+  "lint": [],
+  "build": ["dotnet build"],
+  "test": ["dotnet test"],
+  "smoke": []
+}
 ```
 
-**Verification:**
-```bash
-ls .claude/hooks/    # Should show 5 .sh files
-cat .claude/settings.json | jq '.hooks | keys'  # Should show PreToolUse, PostToolUse, Stop, Notification
+#### Go
+```json
+{
+  "stack": "go",
+  "lint": [],
+  "build": ["go build ./..."],
+  "test": ["go test ./..."],
+  "smoke": []
+}
 ```
 
-### Adım 8: Git Setup
+If the project has custom commands, prefer the commands documented in `docs/IMPLEMENTATION.md`.
+
+### 6. Initialize Git
+
+If the project is not already a Git repo:
 
 ```bash
-git init  # Eğer repo değilse
-git add -A
-git commit -m "Initial project setup with specs and task plan"
+git init
+git add .
+git commit -m "bootstrap: planning docs and autonomy runtime"
 ```
 
----
+If the repo already exists, ensure the working tree is clean before declaring bootstrap complete.
 
-## Next Step: /architect-loop
+### 7. Validate bootstrap
 
-Phase A and B are complete. All documents, hooks, and state files are ready.
+Before finishing, verify:
 
-Tell the user:
+- `docs/SPECIFICATION.md` exists
+- `docs/IMPLEMENTATION.md` exists
+- `docs/TASKS.md` exists
+- `CLAUDE.md` exists
+- `.autonomy/tasks.json` exists and has at least one task
+- `.autonomy/state.json` exists and `stats.total > 0`
+- `.autonomy/state.json` has one state record per task
+- `.autonomy/gates.json` exists
+- `.claude/settings.json` exists
+- `.claude/hooks/*.sh` exist
+- `.claude/bin/sonnet-worker.sh` exists
+- `.claude/bin/codex-worker.sh` exists
+- `.claude/bin/gemini-worker.sh` exists
+- `.claude/bin/autonomy-supervisor.sh` exists
+- all scripts are executable
 
-> **Setup complete!** SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md, CLAUDE.md, and
-> enforcement hooks are all in place.
->
-> To start autonomous development, run: **`/architect-loop`**
->
-> This activates ARCHITECT MODE where Opus 1M dispatches tasks to worker models
-> (Sonnet, Codex, Gemini) and reviews their code. Source code writing is blocked
-> for the architect — all coding is done by worker models.
+### 8. End state
 
-**DO NOT start building code yourself. DO NOT trigger /architect-loop automatically.**
-The user must explicitly invoke it.
+At the end of this skill:
 
----
+- `execution.status` must be `"ready"`
+- `.autonomy/runtime.lock` must **not** exist yet
+- `.autonomy/session_id` may be absent; the supervisor creates it when needed
+- do **not** invoke `/architect-loop` automatically
 
-## Kurallar
+## Final response to the user
 
-1. **Faz sırası zorunlu.** A → B → C. Asla atlama.
-2. **Her doküman için onay al.** SPEC, IMPL, TASKS ayrı ayrı onaylanmalı.
-3. **AskUserQuestion kullan.** Tech stack, veritabanı, auth gibi kararlar için seçenek sun.
-4. **Ölçeğe uyarla.** Hafta sonu projesi = 15-20 görev. Kurumsal = 100+ görev.
-5. **Dokümanlar `./docs/` dizinine.** SPECIFICATION.md, IMPLEMENTATION.md, TASKS.md
-6. **Architect-loop compatible task format.** Task N: başlık, description, files, criteria, deps, phase
-7. **Her satır bu projeye özel.** Generic boilerplate yasak.
+When setup is complete, report:
 
-## Plugin Entegrasyonu
+- task count
+- detected stack
+- gate commands
+- that the runtime is installed
+- that the next command is `/architect-loop`
 
-Kullanıcının başka skill'leri varsa:
-- **frontend-design** → UI bileşen kararlarında kullan
-- **typescript-mastery** → TS projelerde kod standartlarını entegre et
-- **react-app-planner** → React projelerinde derin mimari
+Do not say that autonomous build already started if it has not.

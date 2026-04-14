@@ -1,13 +1,17 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "GNAP_ROLE": "architect"
+  },
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit|Bash",
+        "matcher": "Write|Edit|MultiEdit|Bash|Agent",
         "hooks": [
           {
             "type": "command",
             "command": "bash .claude/hooks/architect-no-direct-write.sh",
-            "timeout": 5
+            "timeout": 8
           }
         ]
       },
@@ -58,51 +62,88 @@
     ]
   },
   "permissions": {
+    "defaultMode": "default",
+    "disableBypassPermissionsMode": "disable",
     "allow": [
       "Read",
       "Glob",
       "Grep",
-      "Bash(git *)",
-      "Bash(claude -p *)",
-      "Bash(codex *)",
-      "Bash(gemini *)",
-      "Bash(npm *)",
-      "Bash(npx *)",
-      "Bash(python *)",
-      "Bash(python3 *)",
-      "Bash(pytest *)",
-      "Bash(dotnet *)",
-      "Bash(go *)",
-      "Bash(cargo *)",
-      "Bash(ruff *)",
-      "Bash(mypy *)",
-      "Bash(curl *)",
-      "Bash(cat *)",
+      "Bash(pwd)",
       "Bash(ls *)",
-      "Bash(mkdir *)",
-      "Bash(touch *)",
-      "Bash(rm .task_done)",
-      "Bash(sleep *)",
-      "Bash(kill *)",
-      "Bash(echo *)",
+      "Bash(find *)",
+      "Bash(cat *)",
       "Bash(head *)",
       "Bash(tail *)",
       "Bash(wc *)",
-      "Bash(grep *)",
-      "Bash(find *)",
-      "Bash(chmod *)",
-      "Bash(jq *)"
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(jq *)",
+      "Bash(date *)",
+      "Bash(printf *)",
+      "Bash(echo *)",
+      "Bash(mkdir -p *)",
+      "Bash(touch .autonomy/*)",
+      "Bash(rm -f .autonomy/*)",
+      "Bash(python - *)",
+      "Bash(python3 - *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git log *)",
+      "Bash(git rev-parse *)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch --list *)",
+      "Bash(git merge --ff-only *)",
+      "Bash(git worktree list *)",
+      "Bash(.claude/bin/sonnet-worker.sh *)",
+      "Bash(.claude/bin/codex-worker.sh *)",
+      "Bash(.claude/bin/gemini-worker.sh *)",
+      "Bash(.claude/bin/autonomy-supervisor.sh *)",
+      "Bash(chmod 755 *)",
+      "Bash(chmod +x *)"
     ],
     "deny": [
-      "Bash(rm -rf *)",
-      "Bash(sudo *)",
-      "Bash(chmod 777 *)",
+      "Agent",
+      "Agent(*)",
+      "Bash(claude -p *)",
+      "Bash(codex exec *)",
+      "Bash(gemini -p *)",
+      "Bash(gemini --prompt *)",
+      "Bash(git apply *)",
+      "Bash(git am *)",
+      "Bash(patch *)",
+      "Bash(sed -i *)",
+      "Bash(perl -pi *)",
+      "Bash(ruby -pi *)",
+      "Bash(python -c *)",
+      "Bash(python3 -c *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(rsync *)",
+      "Bash(install *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git restore *)",
+      "Bash(git cherry-pick *)",
       "Bash(git reset --hard *)",
       "Bash(git push --force *)",
       "Bash(git push * --force *)",
       "Bash(git clean -f *)",
-      "Bash(git branch -D main)",
-      "Bash(git branch -D master)"
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(chmod 777 *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": false,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": true,
+    "excludedCommands": [
+      ".claude/bin/sonnet-worker.sh *",
+      ".claude/bin/codex-worker.sh *",
+      ".claude/bin/gemini-worker.sh *",
+      ".claude/bin/autonomy-supervisor.sh *"
     ]
   }
 }
